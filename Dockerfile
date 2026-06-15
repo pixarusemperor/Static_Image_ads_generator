@@ -25,8 +25,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Entrypoint script that writes ADC credentials from env var to file
-RUN printf '#!/bin/sh\nif [ -n "$GCP_ADC_JSON" ]; then\n  echo "$GCP_ADC_JSON" > /tmp/gcp-adc.json\n  export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-adc.json\nfi\nexec "$@"\n' > /entrypoint.sh && chmod +x /entrypoint.sh
+# Entrypoint script: decodes base64 ADC credentials from env var to file
+RUN printf '#!/bin/sh\nif [ -n "$GCP_ADC_B64" ]; then\n  echo "$GCP_ADC_B64" | base64 -d > /tmp/gcp-adc.json\n  export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-adc.json\nfi\nexec "$@"\n' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
