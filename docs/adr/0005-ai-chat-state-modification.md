@@ -1,0 +1,3 @@
+# 0005. AI Chat Layout Modification via Direct JSON Manipulation
+
+We evaluated direct JSON layout state modifications against structured tool-calling command execution. We decided to use direct JSON layout state modification for the AI Live Chat Assistant. When a user requests a design change in the chat, the AI (utilizing Gemini's Structured Output Mode) receives the current JSON layout state and outputs the fully updated JSON state. To prevent layout corruption and visual overflow, the frontend HTML/CSS Editor will run sanity validators (position boundaries, property range clamping) on the returned layout JSON before applying it to the React state.

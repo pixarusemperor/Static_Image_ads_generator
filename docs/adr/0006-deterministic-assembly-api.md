@@ -1,0 +1,3 @@
+# 0006. Deterministic JSON Assembly API for Integrations
+
+We evaluated a deterministic JSON assembly API against an end-to-end autonomous orchestration API for external agent and automation platform integrations. We decided to expose a deterministic JSON assembly endpoint (`POST /api/assemble`) as the core integration interface. This endpoint takes a template category and structured layer variable values, rendering and returning the compiled ad image instantly. It guarantees 100% predictability, low latency, and clean error handling, allowing calling workflows (like Make.com, Python scripts, or orchestrator agents) to manage layout decision logic independently.
