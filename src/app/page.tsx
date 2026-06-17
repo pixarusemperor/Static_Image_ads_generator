@@ -74,6 +74,7 @@ const defaultTemplatesData: Record<TemplateId, Record<string, any>> = {
     backgroundColor: "#55B23B",
     title: "DOUBLER VOS VENTES EN 90 JOURS",
     subtitle: "(SANS PAYER PLUS DE PUBLICITÉ)",
+    emoji: "👇",
   }
 };
 
@@ -129,6 +130,7 @@ const templateLayers: Record<TemplateId, { key: string; name: string; type: 'tex
     { key: 'backgroundColor', name: 'Background Color', type: 'color' },
     { key: 'title', name: 'Main Title', type: 'text' },
     { key: 'subtitle', name: 'Subtitle', type: 'text' },
+    { key: 'emoji', name: 'Corner Emoji', type: 'text' },
   ],
 };
 

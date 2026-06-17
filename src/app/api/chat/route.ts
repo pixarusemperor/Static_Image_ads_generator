@@ -96,6 +96,7 @@ You must output a JSON object containing the updated "variables" property.`;
                 avatarUrl: { type: 'STRING' },
                 logoUrl: { type: 'STRING' },
                 bodyImage: { type: 'STRING' },
+                emoji: { type: 'STRING' },
               }
             }
           },
@@ -216,6 +217,8 @@ function getMockChatUpdate(prompt: string, templateId: string, variables: any) {
     } else if (templateId === '5-a') {
       if (promptLower.includes('subtitle') || promptLower.includes('sous-titre')) {
         updated.subtitle = textContent;
+      } else if (promptLower.includes('emoji') || promptLower.includes('main')) {
+        updated.emoji = textContent;
       } else {
         updated.title = textContent;
       }

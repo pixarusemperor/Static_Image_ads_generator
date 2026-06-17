@@ -8,6 +8,8 @@ import { getFontBuffers } from '@/utils/fonts';
 
 export const dynamic = 'force-dynamic';
 
+const emojiCache: Record<string, string> = {};
+
 export async function POST(request: NextRequest) {
   try {
     let body;
@@ -69,6 +71,9 @@ export async function POST(request: NextRequest) {
       height,
     });
 
+    // Ignore SSL issues for internal requests
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
     // Render to SVG using Satori
     const svg = await satori(element, {
       width,
@@ -87,6 +92,33 @@ export async function POST(request: NextRequest) {
           style: 'normal',
         },
       ],
+      loadAdditionalAsset: (async (code: string, segment: string) => {
+        if (code === 'emoji') {
+          try {
+            const codepoint = [...segment]
+              .map(char => char.codePointAt(0)!.toString(16))
+              .filter(hex => hex !== 'fe0f')
+              .join('-');
+
+            if (emojiCache[codepoint]) {
+              return emojiCache[codepoint];
+            }
+
+            const url = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codepoint}.svg`;
+            const response = await fetch(url);
+            if (response.ok) {
+              const svgText = await response.text();
+              const base64 = Buffer.from(svgText).toString('base64');
+              const dataUrl = `data:image/svg+xml;base64,${base64}`;
+              emojiCache[codepoint] = dataUrl;
+              return dataUrl;
+            }
+          } catch (e) {
+            console.error('Error loading emoji asset:', e);
+          }
+        }
+        return null;
+      }) as any,
     });
 
     // Convert SVG to PNG using resvg

@@ -4,6 +4,7 @@ export interface Template5AProps {
   backgroundColor?: string;
   title?: string;
   subtitle?: string;
+  emoji?: string;
   width?: number;
   height?: number;
 }
@@ -12,6 +13,7 @@ export const Template5A: React.FC<Template5AProps> = ({
   backgroundColor = "#55B23B",
   title = "DOUBLER VOS VENTES EN 90 JOURS",
   subtitle = "(SANS PAYER PLUS DE PUBLICITÉ)",
+  emoji = "👇",
   width = 1080,
   height = 1080,
 }) => {
@@ -67,7 +69,7 @@ export const Template5A: React.FC<Template5AProps> = ({
           fontSize: '120px',
         }}
       >
-        👇
+        {emoji}
       </div>
       <div
         style={{
@@ -78,7 +80,7 @@ export const Template5A: React.FC<Template5AProps> = ({
           fontSize: '120px',
         }}
       >
-        👇
+        {emoji}
       </div>
     </div>
   );
