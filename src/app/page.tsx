@@ -736,7 +736,7 @@ export default function HTMLCSSEditorDashboard() {
             {/* The scaled Next.js template rendering */}
             <div 
               ref={canvasRef}
-              className="absolute origin-top-left"
+              className="absolute top-0 left-0 origin-top-left"
               style={{
                 width: '1080px',
                 height: '1080px',
