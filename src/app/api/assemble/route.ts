@@ -74,6 +74,45 @@ export async function POST(request: NextRequest) {
     // Ignore SSL issues for internal requests
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
+    // Scan variables for emojis to build graphemeImages map
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F09F}\u{1F1E0}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2B50}\u{263A}\u{26A1}\u{2705}]/gu;
+    const graphemeImages: Record<string, string> = {};
+
+    for (const key of Object.keys(resolvedVariables)) {
+      const val = resolvedVariables[key];
+      if (typeof val === 'string') {
+        const matches = val.match(emojiRegex);
+        if (matches) {
+          for (const emoji of matches) {
+            if (!graphemeImages[emoji]) {
+              const codepoint = [...emoji]
+                .map(char => char.codePointAt(0)!.toString(16))
+                .filter(hex => hex !== 'fe0f')
+                .join('-');
+
+              if (emojiCache[codepoint]) {
+                graphemeImages[emoji] = emojiCache[codepoint];
+              } else {
+                try {
+                  const url = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codepoint}.svg`;
+                  const response = await fetch(url);
+                  if (response.ok) {
+                    const svgText = await response.text();
+                    const base64 = Buffer.from(svgText).toString('base64');
+                    const dataUrl = `data:image/svg+xml;base64,${base64}`;
+                    emojiCache[codepoint] = dataUrl;
+                    graphemeImages[emoji] = dataUrl;
+                  }
+                } catch (e) {
+                  console.error(`Failed to pre-fetch emoji ${emoji}:`, e);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Render to SVG using Satori
     const svg = await satori(element, {
       width,
@@ -92,33 +131,7 @@ export async function POST(request: NextRequest) {
           style: 'normal',
         },
       ],
-      loadAdditionalAsset: (async (code: string, segment: string) => {
-        if (code === 'emoji') {
-          try {
-            const codepoint = [...segment]
-              .map(char => char.codePointAt(0)!.toString(16))
-              .filter(hex => hex !== 'fe0f')
-              .join('-');
-
-            if (emojiCache[codepoint]) {
-              return emojiCache[codepoint];
-            }
-
-            const url = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codepoint}.svg`;
-            const response = await fetch(url);
-            if (response.ok) {
-              const svgText = await response.text();
-              const base64 = Buffer.from(svgText).toString('base64');
-              const dataUrl = `data:image/svg+xml;base64,${base64}`;
-              emojiCache[codepoint] = dataUrl;
-              return dataUrl;
-            }
-          } catch (e) {
-            console.error('Error loading emoji asset:', e);
-          }
-        }
-        return null;
-      }) as any,
+      graphemeImages,
     });
 
     // Convert SVG to PNG using resvg
