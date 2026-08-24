@@ -45,3 +45,11 @@ next-env.d.ts
 
 # design data (user-created designs)
 /data/
+
+.agents/
+.claude/
+.commandcode/
+graphify-out/
+docs/graphify-out/
+src/graphify-out/
+open-design/
