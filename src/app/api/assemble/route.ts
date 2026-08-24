@@ -34,11 +34,21 @@ export async function POST(request: NextRequest) {
     const fonts = await getFontBuffers();
 
     // Get dimensions
-    const dimensions = templatesDimensions[templateId as TemplateId] || { width: 1080, height: 1080 };
-    const { width, height } = dimensions;
+    const width = variables.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
+    const height = variables.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
 
     // Resolve images
     const resolvedVariables = { ...variables };
+
+    // Resolve images inside CustomTemplate layers if applicable
+    if (resolvedVariables.layers && Array.isArray(resolvedVariables.layers)) {
+      for (const layer of resolvedVariables.layers) {
+        if (layer.type === 'image' && layer.imageUrl) {
+          layer.imageUrl = await resolveImageToBase64(layer.imageUrl);
+        }
+      }
+    }
+
     const imageKeys = [
       'image', 'url', 'avatar', 'src', 'logo', 'background', 'product', 'badge', 'flag', 'subject'
     ];

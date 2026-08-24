@@ -6,6 +6,7 @@ import { Template3A, Template3AProps } from './Template3A';
 import { Template3B, Template3BProps } from './Template3B';
 import { Template4A, Template4AProps } from './Template4A';
 import { Template5A, Template5AProps } from './Template5A';
+import { CustomTemplate, CustomTemplateProps } from './CustomTemplate';
 
 export {
   Template1A,
@@ -15,6 +16,7 @@ export {
   Template3B,
   Template4A,
   Template5A,
+  CustomTemplate,
 };
 
 export type {
@@ -25,9 +27,10 @@ export type {
   Template3BProps,
   Template4AProps,
   Template5AProps,
+  CustomTemplateProps,
 };
 
-export type TemplateId = '1-a' | '1-b' | '2-a' | '3-a' | '3-b' | '4-a' | '5-a';
+export type TemplateId = '1-a' | '1-b' | '2-a' | '3-a' | '3-b' | '4-a' | '5-a' | 'custom';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const templatesMap: Record<TemplateId, React.ComponentType<any>> = {
@@ -38,6 +41,7 @@ export const templatesMap: Record<TemplateId, React.ComponentType<any>> = {
   '3-b': Template3B,
   '4-a': Template4A,
   '5-a': Template5A,
+  'custom': CustomTemplate,
 };
 
 // Default width and height for each template type
@@ -49,6 +53,7 @@ export const templatesDimensions: Record<TemplateId, { width: number; height: nu
   '3-b': { width: 1080, height: 1080 },
   '4-a': { width: 1080, height: 1080 },
   '5-a': { width: 1080, height: 1080 },
+  'custom': { width: 1080, height: 1080 },
 };
 
 /**
