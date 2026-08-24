@@ -90,7 +90,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     setObjWidth(Math.round((selectedObject.width || 0) * (selectedObject.scaleX || 1)));
     setObjHeight(Math.round((selectedObject.height || 0) * (selectedObject.scaleY || 1)));
     setOpacity(selectedObject.opacity ?? 1);
-    setRx(selectedObject.rx || 0);
+    setRx((selectedObject as any).rx || 0);
 
     if (selectedObject instanceof fabric.Textbox || selectedObject instanceof fabric.IText) {
       setText(selectedObject.text || '');
