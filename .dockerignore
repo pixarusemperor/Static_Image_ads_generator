@@ -6,3 +6,13 @@ node_modules
 Dockerfile
 .dockerignore
 *.md
+.open-design
+graphify-out
+docs/graphify-out
+src/graphify-out
+.agents
+.claude
+.commandcode
+scratch
+scripts
+*.sh
