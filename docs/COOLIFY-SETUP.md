@@ -31,14 +31,37 @@
 
 - `is_auto_deploy_enabled: true` (under `settings`)
 - `is_force_https_enabled: true` (under `settings`)
-- Coolify polls the `master` branch; no GitHub Actions needed for that path.
-- Additionally, `.github/workflows/deploy.yml` triggers an explicit deploy on every push (POST `/api/v1/deploy`) and polls to `finished` for CI feedback.
+- `build-and-push.yml` builds + pushes image to `ghcr.io/pixarusemperor/static_image_ads_generator:latest` on every push to `master`
+- `deploy.yml` fires the per-app Deploy Webhook URL on `workflow_run` of the build job (Coolify then pulls the new image and restarts the container)
+
+## Deploy Webhook URL (ACTION REQUIRED)
+
+The token in `.env` is read-only (`POST /api/v1/deploy` returns 403 `Missing required permissions: deploy`). The correct trigger is the **per-app Deploy Webhook URL** (see [Coolify docs](https://coolify.io/docs/applications/ci-cd/github/actions#4-get-coolify-webhook-url)).
+
+To finish setup:
+
+1. Open the Coolify panel → App `static-image-ads-generator` → **Webhook** tab
+2. Copy the "Deploy Webhook" URL (looks like `https://coolifyone.orizongroup.online/webhooks/deploy/itg0ipriumh9bqd11p3lr8ro?tag=latest`)
+3. Paste it into `.env` as `COOLIFY_WEBHOOK=...`
+4. Push `.env` change (or just copy the value) to GitHub as a secret:
+   ```bash
+   source .env
+   gh secret set COOLIFY_WEBHOOK --repo pixarusemperor/Static_Image_ads_generator --body "${COOLIFY_WEBHOOK}"
+   ```
+5. Future pushes to `master` will then: build image → push to ghcr.io → fire webhook → Coolify redeploys.
 
 ## GitHub repo secrets (set by `gh secret set`)
 
-- `COOLIFY_API_TOKEN` — Coolify API token (deploy scope)
-- `COOLIFY_APP_UUID` — `itg0ipriumh9bqd11p3lr8ro`
-- `COOLIFY_BASE_URL` — `https://coolifyone.orizongroup.online`
+- `COOLIFY_TOKEN` — Coolify API token (same value as `COOLIFY_API_TOKEN` in `.env`)
+- `COOLIFY_WEBHOOK` — per-app Deploy Webhook URL from Coolify panel (see "Deploy Webhook URL" section above)
+- ~~`COOLIFY_APP_UUID`~~ — no longer needed by the workflow (webhook encodes the app)
+- ~~`COOLIFY_BASE_URL`~~ — no longer needed by the workflow
+
+If you previously set the unused secrets via `gh secret set`, you can leave them; they're inert. To clean up:
+```bash
+gh secret delete COOLIFY_APP_UUID --repo pixarusemperor/Static_Image_ads_generator
+gh secret delete COOLIFY_BASE_URL --repo pixarusemperor/Static_Image_ads_generator
+```
 
 ## First deploy
 
