@@ -92,3 +92,5 @@ curl -sk -X POST \
   -d '{...same payload...}' \
   "${COOLIFY_BASE_URL}/api/v1/applications/public"
 ```
+
+<!-- auto-deploy test at 2026-08-26T17:15:42Z -->
