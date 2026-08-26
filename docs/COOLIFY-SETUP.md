@@ -36,19 +36,24 @@
 
 ## Deploy Webhook URL (ACTION REQUIRED)
 
-The token in `.env` is read-only (`POST /api/v1/deploy` returns 403 `Missing required permissions: deploy`). The correct trigger is the **per-app Deploy Webhook URL** (see [Coolify docs](https://coolify.io/docs/applications/ci-cd/github/actions#4-get-coolify-webhook-url)).
+The webhook URL `https://coolifyone.orizongroup.online/api/v1/deploy?uuid=...&force=false` is the official Coolify GitHub Actions deploy endpoint, but it requires a **deploy-scoped API token**. The current `COOLIFY_API_TOKEN` in `.env` is read-only — every deploy call returns `403 {"message":"Missing required permissions: deploy"}`.
 
-To finish setup:
+Per the [official Coolify docs](https://coolify.io/docs/applications/ci-cd/github/actions#3-create-coolify-api-token), to fix:
 
-1. Open the Coolify panel → App `static-image-ads-generator` → **Webhook** tab
-2. Copy the "Deploy Webhook" URL (looks like `https://coolifyone.orizongroup.online/webhooks/deploy/itg0ipriumh9bqd11p3lr8ro?tag=latest`)
-3. Paste it into `.env` as `COOLIFY_WEBHOOK=...`
-4. Push `.env` change (or just copy the value) to GitHub as a secret:
+1. Open Coolify panel → **Settings** → **Keys & Tokens** → **API Tokens** tab
+2. Click **+ Add** (or regenerate)
+3. **Check the "Deploy" option** under Token permissions — this is the missing scope
+4. Give it a name, click Create
+5. Copy the new token and replace `COOLIFY_API_TOKEN` in `.env`
+6. Update the GitHub secret:
    ```bash
    source .env
-   gh secret set COOLIFY_WEBHOOK --repo pixarusemperor/Static_Image_ads_generator --body "${COOLIFY_WEBHOOK}"
+   gh secret set COOLIFY_TOKEN --repo pixarusemperor/Static_Image_ads_generator --body "${COOLIFY_API_TOKEN}"
    ```
-5. Future pushes to `master` will then: build image → push to ghcr.io → fire webhook → Coolify redeploys.
+7. Push any commit to `master` (or run the deploy workflow from the Actions tab via `workflow_dispatch`)
+8. Verify `https://superads.orizongroup.online` returns 2xx
+
+The webhook URL itself is correct — only the token scope needs to change.
 
 ## GitHub repo secrets (set by `gh secret set`)
 
