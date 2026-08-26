@@ -1,15 +1,16 @@
 # =============================================================================
 # Coolify Deploy — Static_Image_ads_generator
 #
-# Triggers:
-#   Push to the `master` branch
+# Triggers on push to master. Triggers an instant deploy via the proven
+# POST /api/v1/deploy endpoint, then polls until the deployment reaches
+# 'finished' or 'failed' (or 10-minute timeout).
 #
-# Flow:
-#   1. PATCH Coolify API to trigger an instant deploy
-#   2. Poll deployment status every 15 s until finished/failed or 10-min timeout
+# Required repo secrets (set via `gh secret set`):
+#   COOLIFY_API_TOKEN — Coolify API token (deploy scope)
+#   COOLIFY_APP_UUID  — itg0ipriumh9bqd11p3lr8ro (the static-image-ads-generator app)
+#   COOLIFY_BASE_URL  — https://coolifyone.orizongroup.online
 #
-# Secrets required (set in repo Settings → Secrets and variables → Actions):
-#   COOLIFY_API_TOKEN — Coolify API bearer token (value: "1|cool_TOKEN")
+# Reference: https://github.com/pixarusemperor/coolify-deploy-playbook
 # =============================================================================
 
 name: Deploy to Coolify
@@ -20,74 +21,64 @@ on:
       - master
   workflow_dispatch:
 
-# Only one deploy at a time per branch; new pushes cancel the old one
+# Only one deploy at a time per branch; new pushes cancel the old one.
 concurrency:
-  group: coolify-deploy-${{ github.ref }}
+  group: coolify-deploy-static-image-ads-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 12          # 2 min buffer above the 10-min poll loop
+    timeout-minutes: 15  # 5-min buffer above the 10-min poll loop
 
     steps:
-
-      # -------------------------------------------------------------------
-      # STEP 1 — Trigger the Coolify deployment
-      # -------------------------------------------------------------------
       - name: Trigger Coolify deploy
         env:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-          APP_UUID: "jygt5ernjovbf36q391orfs2"
+          APP_UUID:     ${{ secrets.COOLIFY_APP_UUID }}
+          COOLIFY_URL:  ${{ secrets.COOLIFY_BASE_URL }}
         run: |
           set -euo pipefail
+          echo "==> Triggering deploy for app ${APP_UUID} via ${COOLIFY_URL}"
 
-          echo "==> Triggering instant deploy for app ${APP_UUID}"
-
-          RESPONSE=$(curl -k -s -S --fail-with-body \
-            -X PATCH \
+          RESPONSE=$(curl -sk -S --fail-with-body \
+            -X POST \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
             -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            -d '{"instant_deploy": true}' \
-            "https://coolifyone.orizongroup.online/api/v1/applications/${APP_UUID}")
+            -d "{\"uuid\": \"${APP_UUID}\"}" \
+            "${COOLIFY_URL}/api/v1/deploy")
 
-          echo "==> API response:"
           echo "${RESPONSE}" | jq .
 
-          DEPLOY_UUID=$(echo "${RESPONSE}" | jq -r '.deployment_uuid // .uuid // "unknown"')
-          echo "deployment_uuid=${DEPLOY_UUID}" >> "${GITHUB_OUTPUT}"
+          DEPLOY_UUID=$(echo "${RESPONSE}" | jq -r '.deployments[0].deployment_uuid // .deployments[0].uuid // .deployment_uuid // empty')
+          if [ -z "${DEPLOY_UUID}" ]; then
+            echo "::error::No deployment UUID returned — is the token scoped to deploy?"
+            exit 1
+          fi
           echo "==> Deployment UUID: ${DEPLOY_UUID}"
-
         id: trigger
 
-      # -------------------------------------------------------------------
-      # STEP 2 — Poll until terminal state or timeout
-      # -------------------------------------------------------------------
       - name: Wait for deployment
         env:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-          APP_UUID: "jygt5ernjovbf36q391orfs2"
+          APP_UUID:     ${{ secrets.COOLIFY_APP_UUID }}
+          COOLIFY_URL:  ${{ secrets.COOLIFY_BASE_URL }}
         run: |
           set -euo pipefail
-
-          MAX_ATTEMPTS=40          # 40 × 15 s = 10 minutes
+          MAX_ATTEMPTS=40          # 40 × 15s = 10 minutes
           INTERVAL=15
 
           echo "==> Polling deployment status for app ${APP_UUID}"
-          echo "==> Max attempts: ${MAX_ATTEMPTS}   Interval: ${INTERVAL} s"
 
           for i in $(seq 1 ${MAX_ATTEMPTS}); do
             echo ""
             echo "--- Attempt ${i}/${MAX_ATTEMPTS} at $(date -u +%H:%M:%S) UTC ---"
 
-            RESPONSE=$(curl -k -s -S \
+            RESPONSE=$(curl -sk -S \
               -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-              -H "Accept: application/json" \
-              "https://coolifyone.orizongroup.online/api/v1/deployments/applications/${APP_UUID}")
+              "${COOLIFY_URL}/api/v1/deployments/applications/${APP_UUID}")
 
             STATUS=$(echo "${RESPONSE}" | jq -r '.deployments[0].status // "unknown"')
-
             echo "Current status: ${STATUS}"
 
             case "${STATUS}" in
@@ -107,7 +98,6 @@ jobs:
                 exit 1
                 ;;
               queued|building|deploying|*)
-                echo "Deployment in progress (${STATUS})… waiting ${INTERVAL} s"
                 sleep ${INTERVAL}
                 ;;
             esac
@@ -115,6 +105,6 @@ jobs:
 
           echo ""
           echo "=============================================="
-          echo "✗ TIMEOUT — deployment did not finish within 10 minutes"
+          echo "✗ TIMEOUT — deployment did not finish in 10 minutes"
           echo "=============================================="
           exit 1
