@@ -13,8 +13,8 @@ export interface Template1BProps {
 }
 
 export const Template1B: React.FC<Template1BProps> = ({
-  topBackgroundImage = "https://images.unsplash.com/photo-1508962914676-134849a727f0?w=800",
-  productImage = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400",
+  topBackgroundImage = "/templates/assets/PATSIMMSCFLYER1.png",
+  productImage = "/templates/assets/30.png",
   priceBadgeText = "PRIX 5.000F(10$)",
   title = "2 MINUTES AU LIT",
   subtitle = "C'EST RIDICULE",

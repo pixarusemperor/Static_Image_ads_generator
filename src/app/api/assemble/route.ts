@@ -3,6 +3,7 @@ import React from 'react';
 import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import { getTemplateComponent, templatesDimensions, TemplateId } from '@/components/templates';
+import { defaultTemplatesData } from '@/components/templates/template-defaults';
 import { resolveImageToBase64 } from '@/utils/image';
 import { getFontBuffers } from '@/utils/fonts';
 
@@ -37,8 +38,9 @@ export async function POST(request: NextRequest) {
     const width = variables.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
     const height = variables.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
 
-    // Resolve images
-    const resolvedVariables = { ...variables };
+    // Resolve images by merging defaults with supplied variables
+    const defaults = defaultTemplatesData[templateId as TemplateId] || {};
+    const resolvedVariables = { ...defaults, ...variables };
 
     // Resolve images inside CustomTemplate layers if applicable
     if (resolvedVariables.layers && Array.isArray(resolvedVariables.layers)) {
@@ -58,8 +60,8 @@ export async function POST(request: NextRequest) {
       if (typeof value === 'string') {
         const keyLower = key.toLowerCase();
         
-        // Skip keys that obviously contain text, even if they contain an image keyword (like 'priceBadgeText')
-        const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color'].some(word => keyLower.includes(word));
+        // Skip keys that obviously contain non-image text/settings
+        const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color', 'position', 'align', 'mode', 'scale', 'width', 'height'].some(word => keyLower.includes(word));
         if (isTextKey) {
           continue;
         }
@@ -88,34 +90,43 @@ export async function POST(request: NextRequest) {
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F09F}\u{1F1E0}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2B50}\u{263A}\u{26A1}\u{2705}]/gu;
     const graphemeImages: Record<string, string> = {};
 
-    for (const key of Object.keys(resolvedVariables)) {
-      const val = resolvedVariables[key];
-      if (typeof val === 'string') {
-        const matches = val.match(emojiRegex);
-        if (matches) {
-          for (const emoji of matches) {
-            if (!graphemeImages[emoji]) {
-              const codepoint = [...emoji]
-                .map(char => char.codePointAt(0)!.toString(16))
-                .filter(hex => hex !== 'fe0f')
-                .join('-');
+    const allStrings: string[] = [];
+    const collectStrings = (obj: unknown) => {
+      if (typeof obj === 'string') {
+        allStrings.push(obj);
+      } else if (Array.isArray(obj)) {
+        obj.forEach(collectStrings);
+      } else if (obj && typeof obj === 'object') {
+        Object.values(obj).forEach(collectStrings);
+      }
+    };
+    collectStrings(resolvedVariables);
 
-              if (emojiCache[codepoint]) {
-                graphemeImages[emoji] = emojiCache[codepoint];
-              } else {
-                try {
-                  const url = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codepoint}.svg`;
-                  const response = await fetch(url);
-                  if (response.ok) {
-                    const svgText = await response.text();
-                    const base64 = Buffer.from(svgText).toString('base64');
-                    const dataUrl = `data:image/svg+xml;base64,${base64}`;
-                    emojiCache[codepoint] = dataUrl;
-                    graphemeImages[emoji] = dataUrl;
-                  }
-                } catch (e) {
-                  console.error(`Failed to pre-fetch emoji ${emoji}:`, e);
+    for (const val of allStrings) {
+      const matches = val.match(emojiRegex);
+      if (matches) {
+        for (const emoji of matches) {
+          if (!graphemeImages[emoji]) {
+            const codepoint = [...emoji]
+              .map(char => char.codePointAt(0)!.toString(16))
+              .filter(hex => hex !== 'fe0f')
+              .join('-');
+
+            if (emojiCache[codepoint]) {
+              graphemeImages[emoji] = emojiCache[codepoint];
+            } else {
+              try {
+                const url = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codepoint}.svg`;
+                const response = await fetch(url);
+                if (response.ok) {
+                  const svgText = await response.text();
+                  const base64 = Buffer.from(svgText).toString('base64');
+                  const dataUrl = `data:image/svg+xml;base64,${base64}`;
+                  emojiCache[codepoint] = dataUrl;
+                  graphemeImages[emoji] = dataUrl;
                 }
+              } catch (e) {
+                console.error(`Failed to pre-fetch emoji ${emoji}:`, e);
               }
             }
           }

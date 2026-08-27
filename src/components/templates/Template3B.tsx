@@ -12,10 +12,10 @@ export interface Template3BProps {
 }
 
 export const Template3B: React.FC<Template3BProps> = ({
-  backgroundImage = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1000",
+  backgroundImage = "/templates/assets/Screenshot_20260615-144618.jpg",
   postAuthor = "Alex Hormozi",
   postHandle = "@AlexHormozi",
-  postAvatar = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
+  postAvatar = "/templates/assets/images_1.jpeg",
   postContent = "The biggest mistake people make in their 20s is thinking they have time. You don't. Work like someone is trying to take it all away from you.",
   postStats = "12.4k Likes • 2.1k Retweets",
   width = 1080,

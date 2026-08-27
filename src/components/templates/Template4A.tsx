@@ -12,7 +12,7 @@ export interface Template4AProps {
 
 export const Template4A: React.FC<Template4AProps> = ({
   headerTitle = "RECRUTEMENT TELEVENTE",
-  bodyImage = "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1000",
+  bodyImage = "/templates/assets/Copie_de_AFFICHE_RECRUTEMENT_CALL_CENTER_.png",
   flagBadgeUrl = "",
   footerSalary = "SALAIRE DE BASE: 150.000 F CFA",
   footerCommissions = "+ COMMISSIONS DEPLAFONNEES",

@@ -15,8 +15,8 @@ export interface Template1AProps {
 export const Template1A: React.FC<Template1AProps> = ({
   headerLine1 = "TU VERSES LE LIQUIDE VITE",
   headerLine2 = "2 MINUTES? TU ES FAIBLE?",
-  subjectImage = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500",
-  productImage = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400",
+  subjectImage = "/templates/assets/PATSIMMSCFLYER7.png",
+  productImage = "/templates/assets/30.png",
   priceBadgeText = "PRIX 5.000F(10$)",
   footerLine1 = "LIS LA METHODE ET APPLIQUES",
   footerLine2 = "PAS BESOIN DE FAIRE LE SPORT",

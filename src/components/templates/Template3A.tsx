@@ -10,8 +10,8 @@ export interface Template3AProps {
 }
 
 export const Template3A: React.FC<Template3AProps> = ({
-  backgroundImage = "https://images.unsplash.com/photo-1531256456869-ce942a665e80?w=1000",
-  productImage = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400",
+  backgroundImage = "/templates/assets/Screenshot_20260615-144802.jpg",
+  productImage = "/templates/assets/30.png",
   headline = "CE LIVRE A CHANGE MA VIE EN 30 JOURS",
   badgeText = "OFFRE EXCLUSIVE",
   width = 1080,

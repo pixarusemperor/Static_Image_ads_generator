@@ -40,101 +40,123 @@ export interface CustomTemplateProps {
 
 export const CustomTemplate: React.FC<CustomTemplateProps> = ({
   layers = [],
-  canvasBgColor = '#FFFFFF',
-  canvasBgImage = '',
+  canvasBgColor = '#0f172a',
   width = 1080,
   height = 1080,
 }) => {
-  const sortedLayers = [...layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+  const sortedLayers = Array.isArray(layers)
+    ? [...layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+    : [];
 
   return (
     <div
       style={{
         display: 'flex',
+        flexDirection: 'column',
         width: `${width}px`,
         height: `${height}px`,
-        backgroundColor: canvasBgColor,
-        backgroundImage: canvasBgImage ? `url(${canvasBgImage})` : 'none',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundColor: canvasBgColor || '#0f172a',
         position: 'relative',
         fontFamily: 'Inter',
         overflow: 'hidden',
       }}
     >
-      {sortedLayers.map((layer) => {
-        const commonStyle: React.CSSProperties = {
-          display: 'flex',
-          position: 'absolute',
-          left: `${layer.left}px`,
-          top: `${layer.top}px`,
-          width: `${layer.width}px`,
-          height: `${layer.height}px`,
-          zIndex: layer.zIndex || 0,
-          opacity: layer.opacity !== undefined ? layer.opacity : 1,
-        };
+      {sortedLayers
+        .map((layer) => {
+          if (!layer) return null;
 
-        if (layer.type === 'shape') {
-          const shapeStyle: React.CSSProperties = {
-            ...commonStyle,
-            backgroundColor: layer.backgroundColor || layer.color || '#000000',
-            borderRadius: layer.shapeType === 'circle' ? '50%' : layer.borderRadius ? `${layer.borderRadius}px` : '0px',
-            borderWidth: layer.borderWidth ? `${layer.borderWidth}px` : '0px',
-            borderColor: layer.borderColor || 'transparent',
-            borderStyle: layer.borderWidth ? 'solid' : 'none',
-          };
-          return <div key={layer.id} style={shapeStyle} />;
-        }
-
-        if (layer.type === 'image') {
-          const imageStyle: React.CSSProperties = {
-            ...commonStyle,
-            borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
-            overflow: 'hidden',
-            backgroundColor: 'transparent',
-          };
-          return (
-            <div key={layer.id} style={imageStyle}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={layer.imageUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400'}
-                alt={layer.name}
+          if (layer.type === 'shape') {
+            return (
+              <div
+                key={layer.id}
                 style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
+                  display: 'flex',
+                  position: 'absolute',
+                  left: `${layer.left}px`,
+                  top: `${layer.top}px`,
+                  width: `${layer.width}px`,
+                  height: `${layer.height}px`,
+                  backgroundColor: layer.backgroundColor || '#1e293b',
+                  borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
                 }}
-              />
-            </div>
-          );
-        }
+              >
+                <span />
+              </div>
+            );
+          }
 
-        if (layer.type === 'text') {
-          const isBold = layer.fontWeight === 'bold' || layer.fontWeight === '700' || layer.fontWeight === '800';
-          const textStyle: React.CSSProperties = {
-            ...commonStyle,
-            color: layer.color || '#000000',
-            fontSize: `${layer.fontSize || 32}px`,
-            fontWeight: isBold ? 'bold' : 'normal',
-            justifyContent: layer.textAlign === 'center' ? 'center' : layer.textAlign === 'right' ? 'flex-end' : 'flex-start',
-            alignItems: 'center',
-            textAlign: layer.textAlign || 'left',
-            whiteSpace: 'pre-wrap',
-            backgroundColor: layer.textBackgroundColor || 'transparent',
-            borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
-            padding: layer.textBackgroundColor ? '10px 20px' : '0px',
-          };
-          return (
-            <div key={layer.id} style={textStyle}>
-              <span style={{ textAlign: layer.textAlign || 'left' }}>
-                {layer.text}
-              </span>
-            </div>
-          );
-        }
+          if (layer.type === 'image') {
+            return (
+              <div
+                key={layer.id}
+                style={{
+                  display: 'flex',
+                  position: 'absolute',
+                  left: `${layer.left}px`,
+                  top: `${layer.top}px`,
+                  width: `${layer.width}px`,
+                  height: `${layer.height}px`,
+                  borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={layer.imageUrl || '/templates/assets/30.png'}
+                  alt={layer.name || 'image'}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              </div>
+            );
+          }
 
-        return null;
-      })}
+          if (layer.type === 'text') {
+            const isBold =
+              layer.fontWeight === 'bold' ||
+              layer.fontWeight === '700' ||
+              layer.fontWeight === '800';
+            return (
+              <div
+                key={layer.id}
+                style={{
+                  display: 'flex',
+                  position: 'absolute',
+                  left: `${layer.left}px`,
+                  top: `${layer.top}px`,
+                  width: `${layer.width}px`,
+                  height: `${layer.height}px`,
+                  justifyContent:
+                    layer.textAlign === 'center'
+                      ? 'center'
+                      : layer.textAlign === 'right'
+                      ? 'flex-end'
+                      : 'flex-start',
+                  alignItems: 'center',
+                  backgroundColor: layer.textBackgroundColor || 'transparent',
+                  borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
+                }}
+              >
+                <span
+                  style={{
+                    color: layer.color || '#FFFFFF',
+                    fontSize: `${layer.fontSize || 32}px`,
+                    fontWeight: isBold ? 'bold' : 'normal',
+                    textAlign: layer.textAlign || 'left',
+                  }}
+                >
+                  {layer.text || ''}
+                </span>
+              </div>
+            );
+          }
+
+          return null;
+        })
+        .filter(Boolean)}
     </div>
   );
 };
