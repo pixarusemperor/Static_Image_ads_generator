@@ -351,6 +351,13 @@ export function useFabricCanvas() {
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────
 
+  const isTextEditing = useCallback((): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+    const obj = canvas.getActiveObject();
+    return obj instanceof fabric.Textbox && (obj as any).isEditing === true;
+  }, []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
@@ -367,14 +374,7 @@ export function useFabricCanvas() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, deleteSelected]);
-
-  function isTextEditing(): boolean {
-    const canvas = canvasRef.current;
-    if (!canvas) return false;
-    const obj = canvas.getActiveObject();
-    return obj instanceof fabric.Textbox && obj.isEditing === true;
-  }
+  }, [undo, redo, deleteSelected, isTextEditing]);
 
   return {
     // Canvas ref management

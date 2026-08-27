@@ -34,6 +34,8 @@ import { FabricCanvas } from '@/components/FabricCanvas';
 import { useFabricCanvas } from '@/hooks/useFabricCanvas';
 import { FABRIC_TEMPLATES, getFabricTemplate } from '@/components/templates/fabric-templates';
 import { RightSidebar } from '@/components/RightSidebar';
+import { TemplateSelector } from '@/components/TemplateSelector';
+import { getTemplateMetadata } from '@/components/templates/template-registry';
 
 // Fabric.js template JSON for the 7 templates + blank canvas
 import type * as fabric from 'fabric';
@@ -1604,24 +1606,19 @@ export default function HTMLCSSEditorDashboard() {
 
             {/* Template Presets */}
             <div className="flex flex-col gap-2">
-              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                <Sliders className="w-3.5 h-3.5" />
-                Template Pre-set
-              </h3>
-              <select
-                value={templateId}
-                onChange={(e) => handleTemplateChange(e.target.value as TemplateId)}
-                className="w-full py-2 px-3 rounded-lg text-xs bg-zinc-900 border border-zinc-800 focus:outline-none focus:border-indigo-500 text-zinc-200 cursor-pointer"
-              >
-                <option value="1-a">1-A: Niche Product (Default)</option>
-                <option value="1-b">1-B: Niche Product (Split)</option>
-                <option value="2-a">2-A: Publisher Content Card</option>
-                <option value="3-a">3-A: Native Social Ad (Promo)</option>
-                <option value="3-b">3-B: Native Social Ad (Post Card)</option>
-                <option value="4-a">4-A: Recruitment Flyer</option>
-                <option value="5-a">5-A: Typographic Flyer</option>
-                <option value="custom">Blank Visual Canvas</option>
-              </select>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                  <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                  Visual Templates
+                </h3>
+                <span className="text-[10px] text-zinc-500 font-mono">
+                  8 Presets
+                </span>
+              </div>
+              <TemplateSelector
+                selectedTemplateId={templateId}
+                onSelectTemplate={handleTemplateChange}
+              />
             </div>
 
             {/* Active Layers Stack */}
