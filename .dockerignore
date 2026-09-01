@@ -16,14 +16,8 @@ src/graphify-out
 scratch
 scripts
 *.sh
-Ad_bible *
-TYPE OF ADS SAMPLE *
+Ad_bible*
+TYPE OF ADS SAMPLE*
 data
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.webp
-*.svg
 open-design
 .DS_Store

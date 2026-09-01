@@ -28,17 +28,12 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
     }
 
     // Otherwise, treat as a local path
-    let absolutePath = imageSrc;
-    if (!path.isAbsolute(imageSrc)) {
-      absolutePath = path.join(process.cwd(), imageSrc);
-    }
-
-    // Helper check for paths
+    const cleanSrc = imageSrc.startsWith('/') ? imageSrc.slice(1) : imageSrc;
     const checkPaths = [
-      absolutePath,
-      path.join(process.cwd(), 'public', imageSrc),
-      path.join(process.cwd(), 'TYPE OF ADS SAMPLE', imageSrc),
-      path.join(process.cwd(), 'TYPE OF ADS SAMPLE ', imageSrc) // with trailing space
+      path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', cleanSrc),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'templates', 'assets', path.basename(cleanSrc)),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', path.basename(cleanSrc)),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), cleanSrc),
     ];
 
     let foundPath = '';
@@ -63,38 +58,6 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
         contentType = 'image/webp';
       }
       return `data:${contentType};base64,${buffer.toString('base64')}`;
-    }
-
-    // If we've got a relative path starting with /, let's also try strip leading slash
-    if (imageSrc.startsWith('/')) {
-      const strippedSrc = imageSrc.substring(1);
-      const checkPathsStripped = [
-        path.join(process.cwd(), strippedSrc),
-        path.join(process.cwd(), 'public', strippedSrc),
-        path.join(process.cwd(), 'TYPE OF ADS SAMPLE', strippedSrc),
-        path.join(process.cwd(), 'TYPE OF ADS SAMPLE ', strippedSrc)
-      ];
-      for (const p of checkPathsStripped) {
-        if (fs.existsSync(p) && fs.statSync(p).isFile()) {
-          foundPath = p;
-          break;
-        }
-      }
-      if (foundPath) {
-        const buffer = fs.readFileSync(foundPath);
-        const ext = path.extname(foundPath).toLowerCase();
-        let contentType = 'image/png';
-        if (ext === '.jpg' || ext === '.jpeg') {
-          contentType = 'image/jpeg';
-        } else if (ext === '.gif') {
-          contentType = 'image/gif';
-        } else if (ext === '.svg') {
-          contentType = 'image/svg+xml';
-        } else if (ext === '.webp') {
-          contentType = 'image/webp';
-        }
-        return `data:${contentType};base64,${buffer.toString('base64')}`;
-      }
     }
 
     console.warn(`[resolveImageToBase64] Image file not found for: ${imageSrc}`);
