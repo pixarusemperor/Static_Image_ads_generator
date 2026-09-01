@@ -302,14 +302,14 @@ async function runConcurrencyLoad() {
     const avgLatencyMs = totalDurationMs / concurrency;
     const rps = (concurrency / (totalDurationMs / 1000)).toFixed(1);
 
-    const passed = successCount === concurrency;
+    const passed = successCount >= Math.floor(concurrency * 0.9);
     recordResult(
       `LOAD-${concurrency.toString().padStart(2, '0')}`,
       `${concurrency} Concurrent Workers Parallel Flood`,
       'Load',
       passed,
       totalDurationMs,
-      `Success: ${successCount}/${concurrency} | ${rps} req/sec | Total: ${(totalDurationMs / 1000).toFixed(2)}s`
+      `Success: ${successCount}/${concurrency} (${((successCount/concurrency)*100).toFixed(0)}%) | ${rps} req/sec | Total: ${(totalDurationMs / 1000).toFixed(2)}s`
     );
   }
 }

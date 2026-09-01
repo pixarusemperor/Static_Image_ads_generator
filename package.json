@@ -10,11 +10,13 @@
     "dev:webpack": "next dev --webpack -p 4000 -H 0.0.0.0",
     "sync:r2": "node scripts/sync-assets-to-r2.mjs",
     "cli": "node scripts/cli.mjs",
+    "mcp": "node scripts/mcp-server.mjs",
     "test:stress": "node scripts/test-r2-stress-and-edge-cases.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1123.0",
     "@google/genai": "^2.8.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@resvg/resvg-js": "^2.6.2",
     "fabric": "^6.0.0",
     "lucide-react": "^1.18.0",
