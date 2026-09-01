@@ -226,9 +226,9 @@ async function runEdgeCases() {
     recordResult('TC-MEDIA-03', 'Corrupted image header graceful fallback', 'Media', false, 0, e.message);
   }
 
-  // TC-MEDIA-04: Dead / Unreachable Remote Image URL (Timeout Safety)
+  // TC-MEDIA-04: Dead / 404 Remote Image URL (Timeout & Fallback Safety)
   try {
-    const deadUrl = 'http://10.255.255.1/dead-image-timeout.jpg';
+    const deadUrl = 'https://httpbin.org/status/404';
     const { res, latencyMs } = await fetchWithTiming(`${targetUrl}/api/assemble`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

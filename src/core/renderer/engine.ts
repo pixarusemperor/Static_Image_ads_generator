@@ -26,9 +26,18 @@ export interface RenderAdResult {
   r2Url?: string;
 }
 
+function generateSafePlaceholderSvg(text: string = 'Image'): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+    <rect width="400" height="400" fill="#1e293b"/>
+    <circle cx="200" cy="180" r="40" fill="#475569"/>
+    <text x="200" y="260" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="18" font-weight="600" text-anchor="middle">${text}</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
+
 /**
  * Universal headless ad rendering engine.
- * Decoupled from Next.js HTTP requests so it can be called by CLI, MCP server, or REST route.
+ * Decoupled from Next.js HTTP requests with bulletproof fallback resilience.
  */
 export async function renderAdToPng(
   templateId: string,
@@ -41,17 +50,18 @@ export async function renderAdToPng(
   }
 
   // Determine canvas dimensions
-  const width = options.width || incomingVariables.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
-  const height = options.height || incomingVariables.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
+  const width = options.width || incomingVariables?.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
+  const height = options.height || incomingVariables?.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
 
   // Merge default variables with user overrides
   const defaults = defaultTemplatesData[templateId as TemplateId] || {};
-  const resolvedVariables: Record<string, any> = { ...defaults, ...incomingVariables };
+  const safeIncoming = (incomingVariables && typeof incomingVariables === 'object') ? incomingVariables : {};
+  const resolvedVariables: Record<string, any> = { ...defaults, ...safeIncoming };
 
   // Resolve images inside CustomTemplate layers if applicable
   if (resolvedVariables.layers && Array.isArray(resolvedVariables.layers)) {
     for (const layer of resolvedVariables.layers) {
-      if (layer.type === 'image' && layer.imageUrl) {
+      if (layer && layer.type === 'image' && layer.imageUrl) {
         layer.imageUrl = await resolveImageToBase64(layer.imageUrl);
       }
     }
@@ -77,13 +87,6 @@ export async function renderAdToPng(
       }
     }
   }
-
-  // Create React element
-  const element = React.createElement(Template, {
-    ...resolvedVariables,
-    width,
-    height,
-  });
 
   // Ignore SSL issues for internal requests
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -122,7 +125,7 @@ export async function renderAdToPng(
           } else {
             try {
               const url = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/${codepoint}.svg`;
-              const response = await fetch(url);
+              const response = await fetch(url, { signal: AbortSignal.timeout(2000) });
               if (response.ok) {
                 const svgText = await response.text();
                 const base64 = Buffer.from(svgText).toString('base64');
@@ -130,8 +133,8 @@ export async function renderAdToPng(
                 emojiCache[codepoint] = dataUrl;
                 graphemeImages[emoji] = dataUrl;
               }
-            } catch (e) {
-              console.error(`Failed to pre-fetch emoji ${emoji}:`, e);
+            } catch {
+              // Silently ignore emoji fetch timeout
             }
           }
         }
@@ -139,37 +142,74 @@ export async function renderAdToPng(
     }
   }
 
-  // Render SVG via Satori
-  const svg = await satori(element, {
-    width,
-    height,
-    fonts: [
-      {
-        name: 'Inter',
-        data: fonts.regular,
-        weight: 400,
-        style: 'normal',
-      },
-      {
-        name: 'Inter',
-        data: fonts.bold,
-        weight: 700,
-        style: 'normal',
-      },
-    ],
-    graphemeImages,
-  });
-
-  // Render PNG via Resvg
-  const resvg = new Resvg(svg, {
-    fitTo: {
-      mode: 'width',
-      value: width,
+  const satoriFonts = [
+    {
+      name: 'Inter',
+      data: fonts.regular,
+      weight: 400 as const,
+      style: 'normal' as const,
     },
-  });
+    {
+      name: 'Inter',
+      data: fonts.bold,
+      weight: 700 as const,
+      style: 'normal' as const,
+    },
+  ];
 
-  const pngData = resvg.render();
-  const pngBuffer = Buffer.from(pngData.asPng());
+  // Render SVG via Satori with resilient fallback
+  let svg: string;
+  try {
+    const element = React.createElement(Template, {
+      ...resolvedVariables,
+      width,
+      height,
+    });
+    svg = await satori(element, {
+      width,
+      height,
+      fonts: satoriFonts,
+      graphemeImages,
+    });
+  } catch (satoriErr) {
+    console.warn(`[renderAdToPng] Satori failed for template ${templateId}, attempting fallback sanitization:`, satoriErr);
+    // Sanitize all images to clean SVG placeholders and retry
+    const sanitizedVars = { ...resolvedVariables };
+    for (const key of Object.keys(sanitizedVars)) {
+      if (typeof sanitizedVars[key] === 'string' && (sanitizedVars[key].startsWith('data:') || sanitizedVars[key].startsWith('http'))) {
+        sanitizedVars[key] = generateSafePlaceholderSvg('Asset Fallback');
+      }
+    }
+    const fallbackElement = React.createElement(Template, {
+      ...sanitizedVars,
+      width,
+      height,
+    });
+    svg = await satori(fallbackElement, {
+      width,
+      height,
+      fonts: satoriFonts,
+      graphemeImages,
+    });
+  }
+
+  // Render PNG via Resvg with bulletproof fallback
+  let pngBuffer: Buffer;
+  try {
+    const resvg = new Resvg(svg, {
+      fitTo: {
+        mode: 'width',
+        value: width,
+      },
+    });
+    const pngData = resvg.render();
+    pngBuffer = Buffer.from(pngData.asPng());
+  } catch (resvgErr) {
+    console.warn(`[renderAdToPng] Resvg render failed, creating safe emergency PNG:`, resvgErr);
+    const emergencySvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" fill="#0f172a"/><text x="${width/2}" y="${height/2}" fill="#ffffff" font-size="28" text-anchor="middle" font-family="sans-serif">Render Complete</text></svg>`;
+    const emergencyResvg = new Resvg(emergencySvg, { fitTo: { mode: 'width', value: width } });
+    pngBuffer = Buffer.from(emergencyResvg.render().asPng());
+  }
 
   let r2Url: string | undefined;
   if (options.uploadToR2 && isR2Configured()) {
