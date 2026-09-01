@@ -20,7 +20,12 @@ async function safeSvgToPngBase64(svgContent: string): Promise<string> {
   }
   try {
     const { Resvg } = await import('@resvg/resvg-js');
-    const resvg = new Resvg(svgContent, {
+    // Normalize any extreme aspect ratio inside a safe 400x400 canvas box
+    const normalizedSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+      <rect width="400" height="400" fill="#1e293b"/>
+      ${svgContent}
+    </svg>`;
+    const resvg = new Resvg(normalizedSvg, {
       fitTo: { mode: 'width', value: 400 },
       logLevel: 'off',
     });

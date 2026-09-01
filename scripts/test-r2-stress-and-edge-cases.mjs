@@ -210,7 +210,7 @@ async function runEdgeCases() {
 
   // TC-MEDIA-03: Corrupted JPEG Header / Byte Stream
   try {
-    const corruptedBase64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+    const corruptedBase64 = 'data:image/jpeg;base64,INVALID_CORRUPTED_GARBAGE_PAYLOAD_ABC123';
     const { res, latencyMs } = await fetchWithTiming(`${targetUrl}/api/assemble`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
