@@ -39,7 +39,7 @@ async function safeSvgToPngBase64(svgContent: string): Promise<string> {
  * Automatically converts SVGs to raster PNGs so Satori never throws on vector inputs.
  */
 export async function resolveImageToBase64(imageSrc: string | undefined): Promise<string> {
-  if (!imageSrc) {
+  if (!imageSrc || typeof imageSrc !== 'string' || imageSrc.trim() === '') {
     return SAFE_PNG_PLACEHOLDER;
   }
 

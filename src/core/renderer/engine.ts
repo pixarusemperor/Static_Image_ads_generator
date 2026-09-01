@@ -70,21 +70,18 @@ export async function renderAdToPng(
   // Resolve all image fields to base64 Data URLs for Satori
   const imageKeys = ['image', 'url', 'avatar', 'src', 'logo', 'background', 'product', 'badge', 'flag', 'subject'];
   for (const key of Object.keys(resolvedVariables)) {
+    const keyLower = key.toLowerCase();
+    const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color', 'position', 'align', 'mode', 'scale', 'width', 'height'].some(word => keyLower.includes(word));
+    if (isTextKey) {
+      continue;
+    }
+
+    const hasImageWord = imageKeys.some(word => keyLower.includes(word));
     const value = resolvedVariables[key];
-    if (typeof value === 'string') {
-      const keyLower = key.toLowerCase();
-      const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color', 'position', 'align', 'mode', 'scale', 'width', 'height'].some(word => keyLower.includes(word));
-      if (isTextKey) {
-        continue;
-      }
 
-      const hasImageWord = imageKeys.some(word => keyLower.includes(word));
-      const hasImageExt = /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(value);
-      const isUrlOrPath = value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/') || value.includes('/');
-
-      if (hasImageWord || hasImageExt || isUrlOrPath) {
-        resolvedVariables[key] = await resolveImageToBase64(value);
-      }
+    if (hasImageWord || (typeof value === 'string' && (value.startsWith('http') || value.startsWith('/') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(value)))) {
+      const resolved = await resolveImageToBase64(value);
+      resolvedVariables[key] = (resolved && resolved.length > 50) ? resolved : SAFE_PNG_PLACEHOLDER;
     }
   }
 
