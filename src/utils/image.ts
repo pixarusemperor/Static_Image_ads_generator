@@ -8,65 +8,62 @@ const MAX_CACHE_SIZE = 200;
 // Valid 100x100 dark neutral PNG placeholder for Satori (Satori requires raster PNG/JPEG, not SVG)
 export const SAFE_PNG_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAA80lEQVR4nO3RMQEAIBAAIS3ibgb75/Jr3AAV2Oe+v8gQEiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkjMAKvslsmIIK6FAAAAAElFTkSuQmCC';
 
-function isSafeSvg(svg: string): boolean {
-  if (!svg || typeof svg !== 'string') return false;
-  if (!svg.includes('<svg') || !svg.includes('</svg>')) return false;
-  return svg.includes('viewBox') || (svg.includes('width=') && svg.includes('height='));
-}
-
-async function safeSvgToPngBase64(svgContent: string): Promise<string> {
-  if (!isSafeSvg(svgContent)) {
-    return SAFE_PNG_PLACEHOLDER;
-  }
+function isValidRasterDataUrl(dataUrl: string): boolean {
   try {
-    const { Resvg } = await import('@resvg/resvg-js');
-    // Normalize any extreme aspect ratio inside a safe 400x400 canvas box
-    const normalizedSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
-      <rect width="400" height="400" fill="#1e293b"/>
-      ${svgContent}
-    </svg>`;
-    const resvg = new Resvg(normalizedSvg, {
-      fitTo: { mode: 'width', value: 400 },
-      logLevel: 'off',
-    });
-    const pngBuf = resvg.render().asPng();
-    if (pngBuf && pngBuf.length > 0) {
-      return `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`;
+    const parts = dataUrl.split(',');
+    if (parts.length !== 2) return false;
+    const buf = Buffer.from(parts[1], 'base64');
+    if (buf.length < 32) return false;
+
+    // PNG validation & dimension check
+    if (dataUrl.startsWith('data:image/png')) {
+      if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4E || buf[3] !== 0x47) return false;
+      // Read dimensions from IHDR chunk (bytes 16-24)
+      const w = buf.readUInt32BE(16);
+      const h = buf.readUInt32BE(20);
+      if (w === 0 || h === 0) return false;
+      // Reject extreme aspect ratios (> 6:1 or < 1:6) that overflow Satori object-fit: cover scaling
+      const ratio = w / h;
+      if (ratio > 6 || ratio < 0.16) return false;
+      return true;
     }
-    return SAFE_PNG_PLACEHOLDER;
+
+    // JPEG validation
+    if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) {
+      return buf[0] === 0xFF && buf[1] === 0xD8;
+    }
+
+    // WebP validation
+    if (dataUrl.startsWith('data:image/webp')) {
+      return buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+    }
+
+    return false;
   } catch {
-    return SAFE_PNG_PLACEHOLDER;
+    return false;
   }
 }
 
 /**
  * Resolves an image URL, local path, or fallback to a base64 Data URL.
- * Automatically converts SVGs to raster PNGs so Satori never throws on vector inputs.
+ * Automatically sanitizes and guards against corrupted images, dead URLs, and extreme aspect ratios.
  */
 export async function resolveImageToBase64(imageSrc: string | undefined): Promise<string> {
   if (!imageSrc || typeof imageSrc !== 'string' || imageSrc.trim() === '') {
     return SAFE_PNG_PLACEHOLDER;
   }
 
-  // If it's a PNG/JPEG/WebP data URL, return it directly
+  // If it's a PNG/JPEG/WebP data URL, check signature & aspect ratio
   if (imageSrc.startsWith('data:image/png') || imageSrc.startsWith('data:image/jpeg') || imageSrc.startsWith('data:image/webp')) {
-    if (imageSrc.length > 50) {
+    if (isValidRasterDataUrl(imageSrc)) {
       return imageSrc;
     }
     return SAFE_PNG_PLACEHOLDER;
   }
 
-  // If it's an SVG data URL, rasterize it to PNG for Satori
+  // If it's an SVG data URL, fallback to safe PNG placeholder for Satori
   if (imageSrc.startsWith('data:image/svg+xml')) {
-    try {
-      const parts = imageSrc.split(',');
-      if (parts.length === 2) {
-        const svgContent = Buffer.from(parts[1], 'base64').toString('utf-8');
-        return await safeSvgToPngBase64(svgContent);
-      }
-    } catch {
-      return SAFE_PNG_PLACEHOLDER;
-    }
+    return SAFE_PNG_PLACEHOLDER;
   }
 
   // Check in-memory cache
@@ -98,11 +95,14 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
         const contentType = response.headers.get('content-type') || 'image/png';
 
         if (contentType.includes('svg')) {
-          const pngDataUrl = await safeSvgToPngBase64(buffer.toString('utf-8'));
-          return setCache(imageSrc, pngDataUrl);
+          return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
         }
 
-        return setCache(imageSrc, `data:${contentType};base64,${buffer.toString('base64')}`);
+        const dataUrl = `data:${contentType};base64,${buffer.toString('base64')}`;
+        if (isValidRasterDataUrl(dataUrl)) {
+          return setCache(imageSrc, dataUrl);
+        }
+        return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
       } catch {
         return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
       }
@@ -131,8 +131,7 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
       const ext = path.extname(foundPath).toLowerCase();
 
       if (ext === '.svg') {
-        const pngDataUrl = await safeSvgToPngBase64(buffer.toString('utf-8'));
-        return setCache(imageSrc, pngDataUrl);
+        return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
       }
 
       let contentType = 'image/png';
@@ -143,7 +142,12 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
       } else if (ext === '.webp') {
         contentType = 'image/webp';
       }
-      return setCache(imageSrc, `data:${contentType};base64,${buffer.toString('base64')}`);
+
+      const dataUrl = `data:${contentType};base64,${buffer.toString('base64')}`;
+      if (isValidRasterDataUrl(dataUrl)) {
+        return setCache(imageSrc, dataUrl);
+      }
+      return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
     }
 
     // 3. Fallback: Cloudflare R2 CDN Public URL
@@ -157,7 +161,10 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
           const arrayBuffer = await response.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           const contentType = response.headers.get('content-type') || 'image/png';
-          return setCache(imageSrc, `data:${contentType};base64,${buffer.toString('base64')}`);
+          const dataUrl = `data:${contentType};base64,${buffer.toString('base64')}`;
+          if (isValidRasterDataUrl(dataUrl)) {
+            return setCache(imageSrc, dataUrl);
+          }
         }
       }
     } catch {
