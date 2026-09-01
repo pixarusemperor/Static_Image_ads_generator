@@ -8,6 +8,32 @@ const MAX_CACHE_SIZE = 200;
 // Valid 100x100 dark neutral PNG placeholder for Satori (Satori requires raster PNG/JPEG, not SVG)
 export const SAFE_PNG_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAA80lEQVR4nO3RMQEAIBAAIS3ibgb75/Jr3AAV2Oe+v8gQEiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkjMAKvslsmIIK6FAAAAAElFTkSuQmCC';
 
+function isSafeSvg(svg: string): boolean {
+  if (!svg || typeof svg !== 'string') return false;
+  if (!svg.includes('<svg') || !svg.includes('</svg>')) return false;
+  return svg.includes('viewBox') || (svg.includes('width=') && svg.includes('height='));
+}
+
+async function safeSvgToPngBase64(svgContent: string): Promise<string> {
+  if (!isSafeSvg(svgContent)) {
+    return SAFE_PNG_PLACEHOLDER;
+  }
+  try {
+    const { Resvg } = await import('@resvg/resvg-js');
+    const resvg = new Resvg(svgContent, {
+      fitTo: { mode: 'width', value: 400 },
+      logLevel: 'off',
+    });
+    const pngBuf = resvg.render().asPng();
+    if (pngBuf && pngBuf.length > 0) {
+      return `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`;
+    }
+    return SAFE_PNG_PLACEHOLDER;
+  } catch {
+    return SAFE_PNG_PLACEHOLDER;
+  }
+}
+
 /**
  * Resolves an image URL, local path, or fallback to a base64 Data URL.
  * Automatically converts SVGs to raster PNGs so Satori never throws on vector inputs.
@@ -19,7 +45,6 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
 
   // If it's a PNG/JPEG/WebP data URL, return it directly
   if (imageSrc.startsWith('data:image/png') || imageSrc.startsWith('data:image/jpeg') || imageSrc.startsWith('data:image/webp')) {
-    // Validate minimal base64 length
     if (imageSrc.length > 50) {
       return imageSrc;
     }
@@ -32,10 +57,7 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
       const parts = imageSrc.split(',');
       if (parts.length === 2) {
         const svgContent = Buffer.from(parts[1], 'base64').toString('utf-8');
-        const { Resvg } = await import('@resvg/resvg-js');
-        const resvg = new Resvg(svgContent, { fitTo: { mode: 'width', value: 400 } });
-        const pngBuf = resvg.render().asPng();
-        return `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`;
+        return await safeSvgToPngBase64(svgContent);
       }
     } catch {
       return SAFE_PNG_PLACEHOLDER;
@@ -71,14 +93,8 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
         const contentType = response.headers.get('content-type') || 'image/png';
 
         if (contentType.includes('svg')) {
-          try {
-            const { Resvg } = await import('@resvg/resvg-js');
-            const resvg = new Resvg(buffer.toString('utf-8'), { fitTo: { mode: 'width', value: 400 } });
-            const pngBuf = resvg.render().asPng();
-            return setCache(imageSrc, `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`);
-          } catch {
-            return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
-          }
+          const pngDataUrl = await safeSvgToPngBase64(buffer.toString('utf-8'));
+          return setCache(imageSrc, pngDataUrl);
         }
 
         return setCache(imageSrc, `data:${contentType};base64,${buffer.toString('base64')}`);
@@ -110,14 +126,8 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
       const ext = path.extname(foundPath).toLowerCase();
 
       if (ext === '.svg') {
-        try {
-          const { Resvg } = await import('@resvg/resvg-js');
-          const resvg = new Resvg(buffer.toString('utf-8'), { fitTo: { mode: 'width', value: 400 } });
-          const pngBuf = resvg.render().asPng();
-          return setCache(imageSrc, `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`);
-        } catch {
-          return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
-        }
+        const pngDataUrl = await safeSvgToPngBase64(buffer.toString('utf-8'));
+        return setCache(imageSrc, pngDataUrl);
       }
 
       let contentType = 'image/png';

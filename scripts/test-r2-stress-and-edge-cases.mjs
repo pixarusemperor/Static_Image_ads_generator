@@ -191,8 +191,8 @@ async function runEdgeCases() {
 
   // TC-MEDIA-02: Extreme Aspect Ratio (4000x40 Panoramic)
   try {
-    // 100x1 red bar SVG
-    const wideSvg = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="10"><rect width="1000" height="10" fill="red"/></svg>').toString('base64')}`;
+    // 100x1 red bar SVG with valid viewBox
+    const wideSvg = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 10" width="1000" height="10"><rect width="1000" height="10" fill="red"/></svg>').toString('base64')}`;
     const { res, latencyMs } = await fetchWithTiming(`${targetUrl}/api/assemble`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
