@@ -313,15 +313,34 @@ export default function HTMLCSSEditorDashboard() {
     }));
   };
 
-  const handleImageFileChange = (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 1. Instant local preview for zero-latency visual feedback
     const reader = new FileReader();
     reader.onloadend = () => {
       handleVariableChange(key, reader.result as string);
     };
     reader.readAsDataURL(file);
+
+    // 2. Upload in background to Cloudflare R2 / storage endpoint
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          handleVariableChange(key, data.url);
+        }
+      }
+    } catch (err) {
+      console.warn('Background upload to /api/upload failed, retaining local preview:', err);
+    }
   };
 
   // --- Background Removal ---

@@ -31,6 +31,7 @@ const RawEnvSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional().default(''),
   R2_BUCKET_NAME: z.string().optional().default(''),
   R2_PUBLIC_URL: z.string().optional().default(''),
+  NEXT_PUBLIC_R2_PUBLIC_URL: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof RawEnvSchema>;
@@ -80,5 +81,6 @@ export function isR2Configured(): boolean {
 }
 
 export function getR2PublicUrl(): string {
-  return (env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
+  const url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || (typeof env !== 'undefined' ? (env.NEXT_PUBLIC_R2_PUBLIC_URL || env.R2_PUBLIC_URL) : '');
+  return (url || '').replace(/\/+$/, '');
 }
