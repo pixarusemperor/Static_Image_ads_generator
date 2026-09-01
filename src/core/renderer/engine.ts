@@ -3,7 +3,7 @@ import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import { getTemplateComponent, templatesDimensions, TemplateId } from '@/components/templates';
 import { defaultTemplatesData } from '@/components/templates/template-defaults';
-import { resolveImageToBase64 } from '@/utils/image';
+import { resolveImageToBase64, SAFE_PNG_PLACEHOLDER } from '@/utils/image';
 import { getFontBuffers } from '@/utils/fonts';
 import { isR2Configured } from '@/lib/env';
 import { uploadToR2 } from '@/lib/r2';
@@ -177,7 +177,7 @@ export async function renderAdToPng(
     const sanitizedVars = { ...resolvedVariables };
     for (const key of Object.keys(sanitizedVars)) {
       if (typeof sanitizedVars[key] === 'string' && (sanitizedVars[key].startsWith('data:') || sanitizedVars[key].startsWith('http'))) {
-        sanitizedVars[key] = generateSafePlaceholderSvg('Asset Fallback');
+        sanitizedVars[key] = SAFE_PNG_PLACEHOLDER;
       }
     }
     const fallbackElement = React.createElement(Template, {

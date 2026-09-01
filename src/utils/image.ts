@@ -5,28 +5,41 @@ import path from 'path';
 const imageBase64Cache = new Map<string, string>();
 const MAX_CACHE_SIZE = 200;
 
-function generatePlaceholderSvg(text: string = 'Image'): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
-    <rect width="400" height="400" fill="#1e293b"/>
-    <rect x="20" y="20" width="360" height="360" rx="8" fill="none" stroke="#334155" stroke-width="4" stroke-dasharray="8 8"/>
-    <circle cx="200" cy="180" r="40" fill="#475569"/>
-    <text x="200" y="260" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="18" font-weight="600" text-anchor="middle">${text}</text>
-  </svg>`;
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-}
+// Valid 100x100 dark neutral PNG placeholder for Satori (Satori requires raster PNG/JPEG, not SVG)
+export const SAFE_PNG_PLACEHOLDER = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAYAAABw4pVUAAAA80lEQVR4nO3RMQEAIBAAIS3ibgb75/Jr3AAV2Oe+v8gQEiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkiMkBghMUJihMQIiRESIyRGSIyQGCExQmKExAiJERIjJEZIjJAYITFCYoTECIkREiMkRkjMAKvslsmIIK6FAAAAAElFTkSuQmCC';
 
 /**
  * Resolves an image URL, local path, or fallback to a base64 Data URL.
- * Resilient against network timeouts, 404s, and corrupted files.
+ * Automatically converts SVGs to raster PNGs so Satori never throws on vector inputs.
  */
 export async function resolveImageToBase64(imageSrc: string | undefined): Promise<string> {
   if (!imageSrc) {
-    return '';
+    return SAFE_PNG_PLACEHOLDER;
   }
 
-  // If it's already a base64 data URL, return it immediately
-  if (imageSrc.startsWith('data:')) {
-    return imageSrc;
+  // If it's a PNG/JPEG/WebP data URL, return it directly
+  if (imageSrc.startsWith('data:image/png') || imageSrc.startsWith('data:image/jpeg') || imageSrc.startsWith('data:image/webp')) {
+    // Validate minimal base64 length
+    if (imageSrc.length > 50) {
+      return imageSrc;
+    }
+    return SAFE_PNG_PLACEHOLDER;
+  }
+
+  // If it's an SVG data URL, rasterize it to PNG for Satori
+  if (imageSrc.startsWith('data:image/svg+xml')) {
+    try {
+      const parts = imageSrc.split(',');
+      if (parts.length === 2) {
+        const svgContent = Buffer.from(parts[1], 'base64').toString('utf-8');
+        const { Resvg } = await import('@resvg/resvg-js');
+        const resvg = new Resvg(svgContent, { fitTo: { mode: 'width', value: 400 } });
+        const pngBuf = resvg.render().asPng();
+        return `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`;
+      }
+    } catch {
+      return SAFE_PNG_PLACEHOLDER;
+    }
   }
 
   // Check in-memory cache
@@ -51,16 +64,26 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
           signal: AbortSignal.timeout(3000), // Strict 3s timeout
         });
         if (!response.ok) {
-          console.warn(`[resolveImageToBase64] Remote image 404/error (${response.status}) for ${imageSrc}`);
-          return setCache(imageSrc, generatePlaceholderSvg('Media Unavailable'));
+          return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
         }
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const contentType = response.headers.get('content-type') || 'image/png';
+
+        if (contentType.includes('svg')) {
+          try {
+            const { Resvg } = await import('@resvg/resvg-js');
+            const resvg = new Resvg(buffer.toString('utf-8'), { fitTo: { mode: 'width', value: 400 } });
+            const pngBuf = resvg.render().asPng();
+            return setCache(imageSrc, `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`);
+          } catch {
+            return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
+          }
+        }
+
         return setCache(imageSrc, `data:${contentType};base64,${buffer.toString('base64')}`);
-      } catch (err: unknown) {
-        console.warn(`[resolveImageToBase64] Network fetch failed for ${imageSrc}:`, err instanceof Error ? err.message : String(err));
-        return setCache(imageSrc, generatePlaceholderSvg('Load Timeout'));
+      } catch {
+        return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
       }
     }
 
@@ -85,13 +108,23 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
     if (foundPath) {
       const buffer = fs.readFileSync(foundPath);
       const ext = path.extname(foundPath).toLowerCase();
+
+      if (ext === '.svg') {
+        try {
+          const { Resvg } = await import('@resvg/resvg-js');
+          const resvg = new Resvg(buffer.toString('utf-8'), { fitTo: { mode: 'width', value: 400 } });
+          const pngBuf = resvg.render().asPng();
+          return setCache(imageSrc, `data:image/png;base64,${Buffer.from(pngBuf).toString('base64')}`);
+        } catch {
+          return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
+        }
+      }
+
       let contentType = 'image/png';
       if (ext === '.jpg' || ext === '.jpeg') {
         contentType = 'image/jpeg';
       } else if (ext === '.gif') {
         contentType = 'image/gif';
-      } else if (ext === '.svg') {
-        contentType = 'image/svg+xml';
       } else if (ext === '.webp') {
         contentType = 'image/webp';
       }
@@ -116,11 +149,10 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
       // Ignore R2 fallback errors
     }
 
-    // 4. Ultimate Fallback: Generate clean SVG placeholder instead of crashing Satori
-    console.warn(`[resolveImageToBase64] Image not found: ${imageSrc}, providing SVG fallback`);
-    return setCache(imageSrc, generatePlaceholderSvg('Missing Asset'));
+    // 4. Ultimate Fallback: Return safe PNG placeholder
+    return setCache(imageSrc, SAFE_PNG_PLACEHOLDER);
   } catch (error) {
     console.error(`[resolveImageToBase64] Error resolving ${imageSrc}:`, error);
-    return generatePlaceholderSvg('Asset Error');
+    return SAFE_PNG_PLACEHOLDER;
   }
 }
