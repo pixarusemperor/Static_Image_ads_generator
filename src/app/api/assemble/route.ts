@@ -20,11 +20,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
     }
 
-    const { templateId, variables = {} } = body;
+    const { templateId, variables: rawVariables } = body;
 
     if (!templateId) {
       return NextResponse.json({ error: 'Missing templateId' }, { status: 400 });
     }
+
+    // Support both nested `variables: {...}` and flat body `{ templateId, ...variables }`
+    const incomingVariables = (rawVariables && typeof rawVariables === 'object' && Object.keys(rawVariables).length > 0)
+      ? rawVariables
+      : (() => {
+          const { templateId: _, ...rest } = body;
+          return rest;
+        })();
 
     const Template = getTemplateComponent(templateId);
     if (!Template) {
@@ -35,12 +43,12 @@ export async function POST(request: NextRequest) {
     const fonts = await getFontBuffers();
 
     // Get dimensions
-    const width = variables.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
-    const height = variables.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
+    const width = incomingVariables.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
+    const height = incomingVariables.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
 
     // Resolve images by merging defaults with supplied variables
     const defaults = defaultTemplatesData[templateId as TemplateId] || {};
-    const resolvedVariables = { ...defaults, ...variables };
+    const resolvedVariables = { ...defaults, ...incomingVariables };
 
     // Resolve images inside CustomTemplate layers if applicable
     if (resolvedVariables.layers && Array.isArray(resolvedVariables.layers)) {

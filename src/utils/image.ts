@@ -60,6 +60,24 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
       return `data:${contentType};base64,${buffer.toString('base64')}`;
     }
 
+    // Fallback: If not found on local disk, try fetching from Cloudflare R2 if configured
+    try {
+      const { getR2PublicUrl } = await import('@/lib/env');
+      const r2PublicUrl = getR2PublicUrl();
+      if (r2PublicUrl) {
+        const r2Url = `${r2PublicUrl}/${cleanSrc}`;
+        const response = await fetch(r2Url);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const contentType = response.headers.get('content-type') || 'image/png';
+          return `data:${contentType};base64,${buffer.toString('base64')}`;
+        }
+      }
+    } catch {
+      // Ignore R2 fallback errors
+    }
+
     console.warn(`[resolveImageToBase64] Image file not found for: ${imageSrc}`);
     return imageSrc;
   } catch (error) {

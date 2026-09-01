@@ -25,6 +25,12 @@ const RawEnvSchema = z.object({
     .transform((v) => Number.parseInt(v, 10))
     .pipe(z.number().int().positive()),
   NODE_TLS_REJECT_UNAUTHORIZED: z.string().optional(),
+  // Cloudflare R2 Object Storage (Optional, with local fallback)
+  R2_ACCOUNT_ID: z.string().optional().default(''),
+  R2_ACCESS_KEY_ID: z.string().optional().default(''),
+  R2_SECRET_ACCESS_KEY: z.string().optional().default(''),
+  R2_BUCKET_NAME: z.string().optional().default(''),
+  R2_PUBLIC_URL: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof RawEnvSchema>;
@@ -62,4 +68,17 @@ export function requireGeminiApiKey(): string {
 
 export function getGcpProject(): string {
   return env.GCP_PROJECT || env.GOOGLE_CLOUD_PROJECT;
+}
+
+export function isR2Configured(): boolean {
+  return Boolean(
+    env.R2_ACCOUNT_ID &&
+    env.R2_ACCESS_KEY_ID &&
+    env.R2_SECRET_ACCESS_KEY &&
+    env.R2_BUCKET_NAME
+  );
+}
+
+export function getR2PublicUrl(): string {
+  return (env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
 }

@@ -182,12 +182,13 @@ export default function HTMLCSSEditorDashboard() {
   // Adjust canvas scaling to fit container nicely
   useEffect(() => {
     const handleResize = () => {
-      if (canvasRef.current && canvasRef.current.parentElement) {
-        const parentWidth = canvasRef.current.parentElement.clientWidth;
-        const parentHeight = canvasRef.current.parentElement.clientHeight;
-        const scaleW = (parentWidth - 60) / 1080;
-        const scaleH = (parentHeight - 60) / 1080;
-        const scale = Math.min(Math.max(Math.min(scaleW, scaleH), 0.25), 0.7);
+      const container = canvasRef.current?.closest('main');
+      if (container) {
+        const availableW = container.clientWidth - 80;
+        const availableH = container.clientHeight - 80;
+        const scaleW = availableW / 1080;
+        const scaleH = availableH / 1080;
+        const scale = Math.min(Math.max(Math.min(scaleW, scaleH), 0.25), 0.75);
         setCanvasScale(scale);
       }
     };
@@ -469,7 +470,7 @@ export default function HTMLCSSEditorDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId,
-          ...variables,
+          variables,
         }),
       });
 

@@ -73,17 +73,15 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               <div className="relative aspect-square w-full bg-zinc-950/80 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={template.thumbnailUrl}
+                  src={`${template.thumbnailUrl}?v=2`}
                   alt={template.name}
                   onError={(e) => {
-                    // Fallback to PNG if webp has issue
                     const target = e.currentTarget;
-                    if (!target.src.endsWith('.png')) {
-                      target.src = `/templates/thumbnails/${template.id}.png`;
+                    if (!target.src.includes('.webp')) {
+                      target.src = `/templates/thumbnails/${template.id}.webp?v=2`;
                     }
                   }}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  loading="lazy"
                 />
 
                 {/* Gradient shade on hover */}
@@ -174,12 +172,12 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
             <div className="relative aspect-square w-full bg-zinc-950 flex items-center justify-center p-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={previewModalTemplate.thumbnailUrl}
+                src={`${previewModalTemplate.thumbnailUrl}?v=2`}
                 alt={previewModalTemplate.name}
                 onError={(e) => {
                   const target = e.currentTarget;
-                  if (!target.src.endsWith('.png')) {
-                    target.src = `/templates/thumbnails/${previewModalTemplate.id}.png`;
+                  if (!target.src.includes('.webp')) {
+                    target.src = `/templates/thumbnails/${previewModalTemplate.id}.webp?v=2`;
                   }
                 }}
                 className="w-full h-full object-contain rounded-lg shadow-xl"

@@ -13,11 +13,11 @@ export interface Template2AProps {
 }
 
 export const Template2A: React.FC<Template2AProps> = ({
-  backgroundImage = "/templates/assets/Screenshot_20260615-144511.jpg",
+  backgroundImage = "/templates/assets/zuck_news_bg.jpg",
   logoUrl = "",
   logoPosition = 'left',
   hasAvatar = false,
-  avatarUrl = "/templates/assets/images.jpeg",
+  avatarUrl = "/templates/assets/avatar_profile.jpg",
   headline = "CETTE HABITUDE [TUE] APPRIVOISEE PAR LA SCIENCE",
   highlightColor = "#E50914",
   width = 1080,
