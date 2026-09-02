@@ -1,31 +1,69 @@
-#!/usr/bin/env node
-
 /**
- * Model Context Protocol (MCP) Server for SuperAds Creative Engine
- * Standalone Headless Static Ads Microservice
- * 
- * Exposes ad generation, template introspection, spatial composition rules,
- * and payload validation tools over standard stdio JSON-RPC for external
- * services (SYNPHONYS, Claude Desktop, Cursor, Antigravity CLI, n8n, Python).
+ * Single Source of Truth (SSOT) for SuperAds Template Contracts & Element Specifications.
+ * Designed for consumption by external services (SYNPHONYS, automated AI agents, REST clients).
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import fs from 'fs';
-import path from 'path';
+export type ElementType = 'image' | 'text' | 'badge' | 'color' | 'layers';
 
-// Primary and fallback endpoints
-const LOCAL_ENDPOINT = process.env.ADS_API_URL || 'http://localhost:3000';
-const REMOTE_ENDPOINT = 'https://superads.orizongroup.online';
+export interface SpatialPlacement {
+  position: 'absolute' | 'centered' | 'relative';
+  left?: number | string;
+  top?: number | string;
+  right?: number | string;
+  bottom?: number | string;
+  width?: number | string;
+  height?: number | string;
+  alignment?: 'left' | 'center' | 'right';
+  borderRadius?: number | string;
+  zIndex?: number;
+}
 
-/**
- * Complete Single Source of Truth Template Contracts
- */
-const TEMPLATE_CONTRACTS = {
+export interface CompositionRules {
+  aspectRatio?: string;
+  format?: 'transparent-png' | 'full-bleed-photo' | 'portrait-photo' | 'avatar-circle' | 'any';
+  subjectPlacement?: string; // e.g., "Subject face and torso MUST be centered in frame"
+  minResolution?: { width: number; height: number };
+  notes?: string;
+}
+
+export interface TextRules {
+  forcedCase?: 'UPPERCASE' | 'NONE';
+  minWords?: number;
+  maxWords?: number;
+  maxCharacters?: number;
+  fontSize?: number;
+  fontWeight?: 'bold' | 'normal' | '500';
+  highlightSyntax?: string; // e.g. "[bracketed] text will be highlighted"
+  guidance?: string;
+}
+
+export interface TemplateElementContract {
+  key: string;
+  label: string;
+  type: ElementType;
+  mandatory: boolean;
+  defaultValue: any;
+  spatial: SpatialPlacement;
+  compositionRules?: CompositionRules;
+  textRules?: TextRules;
+  purpose: string;
+}
+
+export interface TemplateContract {
+  id: string;
+  name: string;
+  category: 'direct-response' | 'publisher' | 'social' | 'recruitment' | 'typographic' | 'custom';
+  categoryLabel: string;
+  description: string;
+  bestUseCase: string;
+  recommendedNiches: string[];
+  funnelStage: 'Unaware' | 'Problem-Aware' | 'Solution-Aware' | 'Most-Aware' | 'All-Stages';
+  conversionRationale: string;
+  dimensions: { width: number; height: number };
+  elements: TemplateElementContract[];
+}
+
+export const TEMPLATE_CONTRACTS: Record<string, TemplateContract> = {
   '1-a': {
     id: '1-a',
     name: '1-A: Niche Product (Default Dual Banner)',
@@ -35,7 +73,7 @@ const TEMPLATE_CONTRACTS = {
     bestUseCase: 'Physical e-commerce products with visceral pain-points: sexual wellness (Volcano Tea), dietary supplements, physical gadgets, skincare remedies where cash-on-delivery is standard.',
     recommendedNiches: ['Sexual Wellness & Libido', 'Pain Relief & Supplements', 'Physical Gadgets', 'Beauty & Hair Regrowth'],
     funnelStage: 'Problem-Aware',
-    conversionRationale: 'Top black banner qualifies audience -> red banner asks a painful visceral question stopping the thumb -> left subject photo creates emotional empathy -> 3D cutout mockup tangibilizes solution -> yellow pill anchors low price -> footer banners eliminate risk with Payment on Delivery.',
+    conversionRationale: 'The top black banner qualifies the audience -> the red banner asks a painful visceral question stopping the thumb -> the left subject photo creates instant emotional empathy -> the 3D cutout mockup tangibilizes the solution -> the bright yellow pill anchors the low price -> the footer banners eliminate risk with Payment on Delivery.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
       {
@@ -45,8 +83,8 @@ const TEMPLATE_CONTRACTS = {
         mandatory: false,
         defaultValue: 'INFUSION VOLCANIQUE 100% NATURELLE',
         spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 100, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 2, maxWords: 6, maxCharacters: 40, fontSize: 44, fontWeight: 'bold' },
-        purpose: 'Audience qualification and category positioning in top black banner.',
+        textRules: { forcedCase: 'UPPERCASE', minWords: 2, maxWords: 6, maxCharacters: 40, fontSize: 44, fontWeight: 'bold', guidance: 'Names the category or qualifies the audience in solid black banner.' },
+        purpose: 'Audience qualification and category positioning.',
       },
       {
         key: 'headerLine2',
@@ -55,8 +93,8 @@ const TEMPLATE_CONTRACTS = {
         mandatory: true,
         defaultValue: 'SOUFFREZ-VOUS D\'ÉJACULATION PRÉCOCE ?',
         spatial: { position: 'absolute', left: 0, top: 100, width: 1080, height: 110, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 8, maxCharacters: 45, fontSize: 52, fontWeight: 'bold' },
-        purpose: 'The primary scroll-stopping question on high-contrast red banner.',
+        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 8, maxCharacters: 45, fontSize: 52, fontWeight: 'bold', guidance: 'The primary scroll-stopping question on high-contrast red banner.' },
+        purpose: 'Direct-response hook that hits the core symptom or pain point.',
       },
       {
         key: 'subjectImage',
@@ -70,6 +108,7 @@ const TEMPLATE_CONTRACTS = {
           format: 'portrait-photo',
           subjectPlacement: 'CRITICAL: The person or symptom sufferer MUST BE CENTERED horizontally and vertically in the photo frame. Because objectFit is "cover", off-center subjects will have their head or face cut off by the rounded container.',
           minResolution: { width: 600, height: 720 },
+          notes: 'Shows the human target avatar experiencing pain, frustration, or muscular vitality.',
         },
         purpose: 'Human identification and visceral empathy anchor.',
       },
@@ -85,6 +124,7 @@ const TEMPLATE_CONTRACTS = {
           format: 'transparent-png',
           subjectPlacement: 'CRITICAL: Must be a clean 3D product mockup (box, bottle, bag, packaging) with a TRANSPARENT BACKGROUND (PNG). Product should be centered vertically with packaging label clearly readable.',
           minResolution: { width: 400, height: 550 },
+          notes: 'Transparent background prevents ugly rectangular blocks from clashing with the white backdrop.',
         },
         purpose: 'Tangible proof of the product vessel and perceived commercial value.',
       },
@@ -95,8 +135,8 @@ const TEMPLATE_CONTRACTS = {
         mandatory: true,
         defaultValue: 'PRIX : 5.000 FCFA',
         spatial: { position: 'absolute', left: 650, top: 780, width: 350, height: 70, borderRadius: 15, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 24, fontSize: 32, fontWeight: 'bold' },
-        purpose: 'Eliminates price shock and anchors high-perceived-value deal on bright yellow pill.',
+        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 24, fontSize: 32, fontWeight: 'bold', guidance: 'Yellow text (#FFE600) on black pill. Always include clear currency (e.g. FCFA, CFA, $, €).' },
+        purpose: 'Eliminates price shock and anchors high-perceived-value deal.',
       },
       {
         key: 'footerLine1',
@@ -105,7 +145,7 @@ const TEMPLATE_CONTRACTS = {
         mandatory: false,
         defaultValue: 'COMMANDEZ AUJOURD\'HUI & PAYEZ À LA LIVRAISON',
         spatial: { position: 'absolute', left: 0, top: 880, width: 1080, height: 90, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 8, maxCharacters: 48, fontSize: 40, fontWeight: 'bold' },
+        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 8, maxCharacters: 48, fontSize: 40, fontWeight: 'bold', guidance: 'White bold copy on red background.' },
         purpose: 'Immediate direct action prompt emphasizing Cash on Delivery.',
       },
       {
@@ -115,7 +155,7 @@ const TEMPLATE_CONTRACTS = {
         mandatory: false,
         defaultValue: 'LIVRAISON RAPIDE ET DISCRÈTE PARTOUT EN CÔTE D\'IVOIRE',
         spatial: { position: 'absolute', left: 0, top: 970, width: 1080, height: 110, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 4, maxWords: 9, maxCharacters: 52, fontSize: 44, fontWeight: 'bold' },
+        textRules: { forcedCase: 'UPPERCASE', minWords: 4, maxWords: 9, maxCharacters: 52, fontSize: 44, fontWeight: 'bold', guidance: 'Red bold copy on clean white footer.' },
         purpose: 'Overcomes final friction (delivery speed, discretion, geographic availability).',
       },
     ],
@@ -130,7 +170,7 @@ const TEMPLATE_CONTRACTS = {
     bestUseCase: 'Educational digital guides, e-books, specialized courses, boxed kits where the buyer needs a 2-sentence rationale before deciding.',
     recommendedNiches: ['Info-Products & E-books', 'Training Courses', 'Complex Health Formulations', 'Premium High-Ticket Kits'],
     funnelStage: 'Solution-Aware',
-    conversionRationale: 'Top hero photograph sets visual scene -> Yellow high-energy lower half creates a natural reading column -> Split headline + paragraph copy builds rational desire -> Floating 3D mockup proves tangible existence.',
+    conversionRationale: 'Top hero photograph sets the visual scene -> Yellow high-energy lower half creates a natural reading column -> Split headline + paragraph copy builds rational desire -> Floating 3D mockup proves tangible existence.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
       {
@@ -144,6 +184,8 @@ const TEMPLATE_CONTRACTS = {
           aspectRatio: '2.16:1 (1080x500)',
           format: 'full-bleed-photo',
           subjectPlacement: 'CRITICAL: Subject matter must be centered vertically within the top 500px. Avoid placing text in this image.',
+          minResolution: { width: 1080, height: 500 },
+          notes: 'High-contrast lifestyle or symptom photo occupying the entire upper half.',
         },
         purpose: 'Establishes high visual interest and context in the top half.',
       },
@@ -157,7 +199,8 @@ const TEMPLATE_CONTRACTS = {
         compositionRules: {
           aspectRatio: '2:3',
           format: 'transparent-png',
-          subjectPlacement: 'CRITICAL: 3D book or package cutout with transparent background.',
+          subjectPlacement: 'CRITICAL: 3D book or package cutout with transparent background. Positioned bridging the top photo and lower yellow backdrop.',
+          minResolution: { width: 300, height: 450 },
         },
         purpose: 'Provides tangible representation of the guide or product.',
       },
@@ -237,6 +280,8 @@ const TEMPLATE_CONTRACTS = {
           aspectRatio: '1:1 (1080x1080)',
           format: 'full-bleed-photo',
           subjectPlacement: 'CRITICAL: The main subject, face, or focal action MUST BE IN THE UPPER 60% of the image (top 0 to 650px). The bottom 40% will be obscured by a dark gradient overlay designed to ensure headline readability.',
+          minResolution: { width: 1080, height: 1080 },
+          notes: 'Authentic documentary, investigative, or documentary-style photography.',
         },
         purpose: 'Creates authentic editorial atmosphere and journalistic realism.',
       },
@@ -255,6 +300,7 @@ const TEMPLATE_CONTRACTS = {
           fontSize: 48,
           fontWeight: 'bold',
           highlightSyntax: 'CRITICAL: Enclose the primary keyword in square brackets like [keyword] to automatically render a colored highlight box behind it.',
+          guidance: 'Write like a headline from Le Figaro or New York Times: curious, objective, sensational yet credible.',
         },
         purpose: 'High-curiosity hook that demands reading the advertorial.',
       },
@@ -274,7 +320,7 @@ const TEMPLATE_CONTRACTS = {
         mandatory: false,
         defaultValue: '/templates/assets/PATSIMMSCFLYER7.png',
         spatial: { position: 'absolute', top: 50, left: 50, height: 50 },
-        compositionRules: { format: 'transparent-png' },
+        compositionRules: { format: 'transparent-png', notes: 'If omitted, displays clean "NEWS" pill badge.' },
         purpose: 'Media authority badge in top header.',
       },
       {
@@ -296,7 +342,8 @@ const TEMPLATE_CONTRACTS = {
         compositionRules: {
           aspectRatio: '1:1',
           format: 'avatar-circle',
-          subjectPlacement: 'CRITICAL: Face MUST be centered in square/circle crop so it is not cut off by circular border.',
+          subjectPlacement: 'CRITICAL: Face MUST be centered in square/circle crop so it is not skewed or cut off by the circular border.',
+          minResolution: { width: 200, height: 200 },
         },
         purpose: 'Author or doctor authority proof.',
       },
@@ -312,7 +359,7 @@ const TEMPLATE_CONTRACTS = {
     bestUseCase: 'Flash sales, limited-stock drops, impulse-buy products, and TikTok/Instagram dark-mode feed ads.',
     recommendedNiches: ['Flash E-commerce Offers', 'Fitness & Slimming', 'Consumer Tech Accessories', 'Impulse Cosmetics'],
     funnelStage: 'Most-Aware',
-    conversionRationale: 'Dark aesthetics match social media dark modes -> Circular inset instantly highlights product -> Rotated badge creates urgency -> Bottom translucent card delivers a punchy guarantee.',
+    conversionRationale: 'Dark aesthetics match social media dark modes -> Circular inset instantly highlights the product -> Rotated badge creates visual urgency -> Bottom translucent card delivers a punchy guarantee.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
       {
@@ -322,7 +369,11 @@ const TEMPLATE_CONTRACTS = {
         mandatory: true,
         defaultValue: '/templates/assets/MRESISTORFLYER5.png',
         spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 1080 },
-        compositionRules: { aspectRatio: '1:1', format: 'full-bleed-photo' },
+        compositionRules: {
+          aspectRatio: '1:1 (1080x1080)',
+          format: 'full-bleed-photo',
+          subjectPlacement: 'Dark-themed background with moody lighting. Avoid busy text.',
+        },
         purpose: 'Creates dramatic contrast for product and text elements.',
       },
       {
@@ -336,6 +387,7 @@ const TEMPLATE_CONTRACTS = {
           aspectRatio: '1:1',
           format: 'any',
           subjectPlacement: 'CRITICAL: Product MUST BE CENTERED inside the 240x240 circle. Border is bright yellow (#FFE600).',
+          minResolution: { width: 300, height: 300 },
         },
         purpose: 'High-visibility focal anchor showing product.',
       },
@@ -415,6 +467,7 @@ const TEMPLATE_CONTRACTS = {
           aspectRatio: '1:1',
           format: 'avatar-circle',
           subjectPlacement: 'CRITICAL: Face must be centered in square/circle crop.',
+          minResolution: { width: 150, height: 150 },
         },
         purpose: 'Face photo of the testimonial provider.',
       },
@@ -450,7 +503,7 @@ const TEMPLATE_CONTRACTS = {
     bestUseCase: 'Recruiting tele-sales agents, hiring closing reps, distributor recruitment, affiliate onboarding.',
     recommendedNiches: ['Call Center & Telesales Hiring', 'Distributor Programs', 'Affiliate Network Expansion', 'Corporate Vacancies'],
     funnelStage: 'All-Stages',
-    conversionRationale: 'Clear bold job title -> Real workplace photo building trust -> Immediate transparent salary figures answering candidate questions.',
+    conversionRationale: 'Clear bold job title -> Real workplace photo building trust -> Immediate transparent salary figures answering the candidate\'s #1 question immediately.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
       {
@@ -473,7 +526,9 @@ const TEMPLATE_CONTRACTS = {
         compositionRules: {
           aspectRatio: '23:15 (920x600)',
           format: 'full-bleed-photo',
-          subjectPlacement: 'CRITICAL: The workplace environment, office team, or workers MUST BE CENTERED in the photo frame. Dimensions are 920px wide by 600px tall.',
+          subjectPlacement: 'CRITICAL: The workplace environment, office team, or workers MUST BE CENTERED in the photo frame. The photo is 920px wide by 600px tall.',
+          minResolution: { width: 920, height: 600 },
+          notes: 'Authentic workplace photo showing agents with headsets, computers, or professional desks.',
         },
         purpose: 'Proves the legitimacy and professional atmosphere of the company.',
       },
@@ -485,7 +540,7 @@ const TEMPLATE_CONTRACTS = {
         defaultValue: '/templates/assets/PATSIMMSCFLYER7.png',
         spatial: { position: 'absolute', top: 30, left: 30, width: 120, height: 80 },
         compositionRules: { format: 'any' },
-        purpose: 'Geographic targeting flag or urgent hiring sticker.',
+        purpose: 'Geographic targeting flag (e.g. Cameroon, Ivory Coast, Senegal) or urgent hiring sticker.',
       },
       {
         key: 'footerSalary',
@@ -519,7 +574,7 @@ const TEMPLATE_CONTRACTS = {
     bestUseCase: 'Direct WhatsApp click-to-chat ad campaigns, urgent announcements, simple black-and-white propositions where image distractions lower conversion.',
     recommendedNiches: ['Direct WhatsApp Orders', 'Flash Announcements', 'High-Friction Problem Solutions', 'Viral Questions'],
     funnelStage: 'Problem-Aware',
-    conversionRationale: 'Eliminates image processing friction. On WhatsApp campaigns, users react faster to a massive direct question on a green background matching WhatsApp branding.',
+    conversionRationale: 'Eliminates all image processing friction. On WhatsApp campaigns, users react faster to a massive direct question on a green background that matches WhatsApp branding.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
       {
@@ -538,7 +593,7 @@ const TEMPLATE_CONTRACTS = {
         mandatory: true,
         defaultValue: 'VOULEZ-VOUS DURER PLUS DE 45 MINUTES NATURELLEMENT ?',
         spatial: { position: 'relative', alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 10, maxCharacters: 55, fontSize: 72, fontWeight: 'bold' },
+        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 10, maxCharacters: 55, fontSize: 72, fontWeight: 'bold', guidance: 'Massive white bold text.' },
         purpose: 'The singular, unavoidable question or value proposition.',
       },
       {
@@ -598,92 +653,74 @@ const TEMPLATE_CONTRACTS = {
 };
 
 /**
- * Execute HTTP assemble request with automatic local/remote failover
+ * Helper to fetch a complete contract
  */
-async function executeAssembleRequest(payload, customEndpoint) {
-  const endpointsToTry = [];
-  if (customEndpoint) {
-    endpointsToTry.push(customEndpoint);
-  }
-  endpointsToTry.push(LOCAL_ENDPOINT);
-  endpointsToTry.push(REMOTE_ENDPOINT);
-
-  const uniqueEndpoints = [...new Set(endpointsToTry)];
-  let lastError = null;
-
-  for (const endpoint of uniqueEndpoints) {
-    try {
-      const url = `${endpoint.replace(/\/$/, '')}/api/assemble`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(15000),
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        return { success: true, endpoint, data: json };
-      } else {
-        const errText = await res.text();
-        lastError = new Error(`HTTP ${res.status} from ${endpoint}: ${errText}`);
-      }
-    } catch (err) {
-      lastError = err;
-    }
-  }
-
-  throw lastError || new Error('All assemble endpoints failed');
+export function getTemplateContract(templateId: string): TemplateContract | undefined {
+  return TEMPLATE_CONTRACTS[templateId];
 }
 
 /**
- * Helper to validate a template payload against its contract
+ * Diagnostic validation for external callers.
+ * Validates an incoming variables payload against the template's contract.
  */
-function validatePayload(templateId, variables = {}) {
+export interface ValidationDiagnostic {
+  isValid: boolean;
+  templateId: string;
+  missingMandatory: string[];
+  warnings: string[];
+  compositionAdvice: string[];
+  resolvedVariables: Record<string, any>;
+}
+
+export function validateTemplatePayload(
+  templateId: string,
+  variables: Record<string, any> = {}
+): ValidationDiagnostic {
   const contract = TEMPLATE_CONTRACTS[templateId];
   if (!contract) {
     return {
       isValid: false,
       templateId,
-      missingMandatory: [`Invalid templateId "${templateId}". Valid IDs: ${Object.keys(TEMPLATE_CONTRACTS).join(', ')}`],
+      missingMandatory: [`Invalid templateId "${templateId}". Available: ${Object.keys(TEMPLATE_CONTRACTS).join(', ')}`],
       warnings: [],
       compositionAdvice: [],
       resolvedVariables: variables,
     };
   }
 
-  const missingMandatory = [];
-  const warnings = [];
-  const compositionAdvice = [];
-  const resolvedVariables = { ...variables };
+  const missingMandatory: string[] = [];
+  const warnings: string[] = [];
+  const compositionAdvice: string[] = [];
+  const resolvedVariables: Record<string, any> = { ...variables };
 
   for (const elem of contract.elements) {
     const val = variables[elem.key];
     const isProvided = val !== undefined && val !== null && val !== '';
 
+    // Check mandatory
     if (elem.mandatory && !isProvided) {
       missingMandatory.push(`Missing mandatory element: "${elem.key}" (${elem.label})`);
+      // Fill with default so rendering won't crash if forced
       resolvedVariables[elem.key] = elem.defaultValue;
     }
 
+    // Check text rules
     if (elem.type === 'text' && isProvided && typeof val === 'string') {
       if (elem.textRules?.maxCharacters && val.length > elem.textRules.maxCharacters) {
-        warnings.push(`Text for "${elem.key}" is ${val.length} chars (exceeds recommended max ${elem.textRules.maxCharacters} chars).`);
+        warnings.push(`Text for "${elem.key}" is ${val.length} chars (exceeds recommended max ${elem.textRules.maxCharacters} chars). Text may overflow or shrink on mobile.`);
       }
       if (elem.textRules?.forcedCase === 'UPPERCASE' && val.toUpperCase() !== val) {
         warnings.push(`Element "${elem.key}" works best in UPPERCASE for visual punch. Recommended: "${val.toUpperCase()}"`);
       }
     }
 
+    // Check image composition rules
     if (elem.type === 'image') {
       if (elem.compositionRules?.subjectPlacement) {
         compositionAdvice.push(`[${elem.key}]: ${elem.compositionRules.subjectPlacement}`);
       }
       if (elem.compositionRules?.format === 'transparent-png' && typeof val === 'string' && !val.includes('.png') && !val.includes('image/png')) {
-        warnings.push(`[${elem.key}] is marked as "transparent-png". Ensure asset has transparent background to avoid rectangular artifacts.`);
+        warnings.push(`[${elem.key}] is marked as "transparent-png". Ensure your asset has a transparent background to prevent rectangular artifacts.`);
       }
     }
   }
@@ -697,476 +734,3 @@ function validatePayload(templateId, variables = {}) {
     resolvedVariables,
   };
 }
-
-/**
- * Create the MCP Server instance
- */
-const server = new Server(
-  {
-    name: 'superads-creative-engine',
-    version: '2.0.0',
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  }
-);
-
-/**
- * Tool Definition Schema Handler
- */
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: 'list_templates',
-        description: 'Returns all available SuperAds templates with descriptions, best use cases, recommended e-commerce niches, funnel awareness stages, and mandatory element counts.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            category: {
-              type: 'string',
-              enum: ['all', 'direct-response', 'publisher', 'social', 'recruitment', 'typographic', 'custom'],
-              description: 'Optional category filter.',
-            },
-          },
-        },
-      },
-      {
-        name: 'get_template_details',
-        description: 'Returns the COMPLETE contract for a template: all required text/image elements, mandatory vs optional flags, spatial coordinates, image composition rules (e.g. centering, transparent cutouts), character bounds, and default values.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            templateId: {
-              type: 'string',
-              enum: ['1-a', '1-b', '2-a', '3-a', '3-b', '4-a', '5-a', 'custom'],
-              description: 'Template identifier to inspect.',
-            },
-          },
-          required: ['templateId'],
-        },
-      },
-      {
-        name: 'validate_template_payload',
-        description: 'Validates an ad creative payload against the template contract before rendering. Flags missing mandatory elements, text overflow warnings, and image centering/transparency composition rules.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            templateId: {
-              type: 'string',
-              description: 'Target template ID (e.g. "1-a", "2-a").',
-            },
-            variables: {
-              type: 'object',
-              description: 'Key-value dictionary of variables to validate.',
-            },
-          },
-          required: ['templateId', 'variables'],
-        },
-      },
-      {
-        name: 'render_ad',
-        description: 'Compiles and renders a high-converting static image ad to Base64 PNG preview, local file path, or Cloudflare R2 CDN URL.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            templateId: {
-              type: 'string',
-              description: 'The template ID to render.',
-            },
-            variables: {
-              type: 'object',
-              description: 'Key-value object containing template text/image variables matching the template contract.',
-            },
-            uploadToR2: {
-              type: 'boolean',
-              description: 'Whether to upload directly to Cloudflare R2 bucket and return public CDN URL.',
-              default: false,
-            },
-            outputPath: {
-              type: 'string',
-              description: 'Optional local file path to save rendered PNG.',
-            },
-            endpoint: {
-              type: 'string',
-              description: 'Optional custom assembly API endpoint URL.',
-            },
-          },
-          required: ['templateId'],
-        },
-      },
-      {
-        name: 'batch_render_campaign',
-        description: 'Executes high-volume multivariate batch rendering of static ad creatives for A/B testing across angles, hooks, and templates.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            manifest: {
-              type: 'array',
-              description: 'Array of ad configurations to render: [{ templateId: "1-a", variables: {...}, outputName: "hook1.png", uploadToR2: true }].',
-              items: {
-                type: 'object',
-                properties: {
-                  templateId: { type: 'string' },
-                  variables: { type: 'object' },
-                  outputName: { type: 'string' },
-                  uploadToR2: { type: 'boolean' },
-                },
-                required: ['templateId'],
-              },
-            },
-            outputDir: {
-              type: 'string',
-              description: 'Local directory to save generated PNG images (default: "./output").',
-            },
-            endpoint: {
-              type: 'string',
-              description: 'Optional custom assembly API endpoint URL.',
-            },
-          },
-          required: ['manifest'],
-        },
-      },
-      {
-        name: 'validate_ad_copy',
-        description: 'Direct-response copy auditor scoring headline length, price formatting (FCFA), urgency triggers, and trust points against direct-response best practices.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            templateId: { type: 'string' },
-            headline: { type: 'string' },
-            subtitle: { type: 'string' },
-            priceBadge: { type: 'string' },
-            body: { type: 'string' },
-            cta: { type: 'string' },
-          },
-        },
-      },
-    ],
-  };
-});
-
-/**
- * Tool Execution Handler
- */
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case 'list_templates': {
-        const categoryFilter = args?.category;
-        let list = Object.values(TEMPLATE_CONTRACTS);
-        if (categoryFilter && categoryFilter !== 'all') {
-          list = list.filter(t => t.category === categoryFilter);
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  count: list.length,
-                  templates: list.map(t => ({
-                    id: t.id,
-                    name: t.name,
-                    category: t.category,
-                    description: t.description,
-                    bestUseCase: t.bestUseCase,
-                    recommendedNiches: t.recommendedNiches,
-                    funnelStage: t.funnelStage,
-                    dimensions: t.dimensions,
-                    mandatoryElements: t.elements.filter(e => e.mandatory).map(e => e.key),
-                    optionalElements: t.elements.filter(e => !e.mandatory).map(e => e.key),
-                  })),
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case 'get_template_details': {
-        const templateId = args?.templateId;
-        const contract = TEMPLATE_CONTRACTS[templateId];
-        if (!contract) {
-          throw new Error(`Template "${templateId}" not found. Valid IDs: ${Object.keys(TEMPLATE_CONTRACTS).join(', ')}`);
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(contract, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'validate_template_payload': {
-        const templateId = args?.templateId;
-        const variables = args?.variables || {};
-        const diag = validatePayload(templateId, variables);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(diag, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'render_ad': {
-        const templateId = args?.templateId;
-        const variables = args?.variables || {};
-        const uploadToR2 = Boolean(args?.uploadToR2);
-        const outputPath = args?.outputPath;
-        const customEndpoint = args?.endpoint;
-
-        // Run validation check first
-        const diag = validatePayload(templateId, variables);
-
-        const assembleResult = await executeAssembleRequest(
-          {
-            templateId,
-            variables: diag.resolvedVariables,
-            uploadToR2,
-          },
-          customEndpoint
-        );
-
-        const resData = assembleResult.data;
-        let localSavedPath = null;
-
-        if (outputPath && resData.dataUrl) {
-          const base64Clean = resData.dataUrl.replace(/^data:image\/png;base64,/, '');
-          const buffer = Buffer.from(base64Clean, 'base64');
-          const resolvedPath = path.resolve(outputPath);
-          const parentDir = path.dirname(resolvedPath);
-          if (!fs.existsSync(parentDir)) {
-            fs.mkdirSync(parentDir, { recursive: true });
-          }
-          fs.writeFileSync(resolvedPath, buffer);
-          localSavedPath = resolvedPath;
-        }
-
-        const approxSizeKb = resData.dataUrl
-          ? (Math.round((resData.dataUrl.length * 0.75) / 1024 * 10) / 10)
-          : null;
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  success: true,
-                  templateId,
-                  dimensions: {
-                    width: resData.width || 1080,
-                    height: resData.height || 1080,
-                  },
-                  r2Url: resData.r2Url || null,
-                  localSavedPath,
-                  approxSizeKb,
-                  endpointUsed: assembleResult.endpoint,
-                  diagnostics: {
-                    isValid: diag.isValid,
-                    missingMandatory: diag.missingMandatory,
-                    warnings: diag.warnings,
-                  },
-                  dataUrlPreview: resData.dataUrl ? resData.dataUrl.substring(0, 100) + '...' : null,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case 'batch_render_campaign': {
-        const manifest = args?.manifest;
-        if (!Array.isArray(manifest) || manifest.length === 0) {
-          throw new Error('Manifest must be a non-empty array of ad configurations.');
-        }
-
-        const outputDir = path.resolve(args?.outputDir || './output');
-        if (!fs.existsSync(outputDir)) {
-          fs.mkdirSync(outputDir, { recursive: true });
-        }
-
-        const customEndpoint = args?.endpoint;
-        const results = [];
-
-        for (let i = 0; i < manifest.length; i++) {
-          const item = manifest[i];
-          const templateId = item.templateId || '1-a';
-          const outputName = item.outputName || `campaign-ad-${i + 1}-${templateId}.png`;
-          const uploadToR2 = Boolean(item.uploadToR2);
-          const destPath = path.join(outputDir, outputName);
-
-          try {
-            const diag = validatePayload(templateId, item.variables || {});
-            const assembleResult = await executeAssembleRequest(
-              {
-                templateId,
-                variables: diag.resolvedVariables,
-                uploadToR2,
-              },
-              customEndpoint
-            );
-
-            const resData = assembleResult.data;
-            if (resData.dataUrl) {
-              const base64Clean = resData.dataUrl.replace(/^data:image\/png;base64,/, '');
-              fs.writeFileSync(destPath, Buffer.from(base64Clean, 'base64'));
-            }
-
-            results.push({
-              index: i + 1,
-              templateId,
-              outputName,
-              success: true,
-              savedTo: destPath,
-              r2Url: resData.r2Url || null,
-              warnings: diag.warnings,
-            });
-          } catch (err) {
-            results.push({
-              index: i + 1,
-              templateId,
-              outputName,
-              success: false,
-              error: err.message,
-            });
-          }
-        }
-
-        const successCount = results.filter(r => r.success).length;
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  totalRequested: manifest.length,
-                  successful: successCount,
-                  failed: manifest.length - successCount,
-                  outputDirectory: outputDir,
-                  creatives: results,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case 'validate_ad_copy': {
-        const { headline = '', subtitle = '', priceBadge = '', body = '', cta = '' } = args || {};
-
-        const suggestions = [];
-        const warnings = [];
-        let score = 100;
-
-        if (headline.length > 0) {
-          const words = headline.trim().split(/\s+/).length;
-          if (words > 12) {
-            warnings.push(`Headline is ${words} words long. Recommended maximum for mobile readability is 8-10 words.`);
-            score -= 15;
-          }
-          if (headline.toUpperCase() === headline && headline.length > 50) {
-            suggestions.push('Long all-caps headlines can be hard to parse on small screens; consider sentence case with highlighted keywords.');
-          }
-        } else {
-          warnings.push('Missing primary headline.');
-          score -= 30;
-        }
-
-        if (priceBadge.length > 0) {
-          const hasCurrency = /(FCFA|F\b|CFA|XOF|\$|€|GNF)/i.test(priceBadge);
-          if (!hasCurrency) {
-            suggestions.push('Price badge is missing explicit currency (e.g. FCFA or CFA) which reduces clarity.');
-            score -= 10;
-          }
-        }
-
-        const fullText = `${headline} ${subtitle} ${body} ${cta}`.toLowerCase();
-        const hasReassurance = /(livraison|paiement|discret|garanti|naturel|gratuit|remboursement)/i.test(fullText);
-        if (!hasReassurance) {
-          suggestions.push('Add trust terms such as "Paiement à la livraison", "Livraison discrète", or "100% Naturel".');
-          score -= 15;
-        }
-
-        const hasUrgency = /(aujourd'hui|limité|stock|derniers|vite|promo|urgent)/i.test(fullText);
-        if (!hasUrgency) {
-          suggestions.push('Add urgency elements (e.g. "Offre valable aujourd\'hui", "Stock limité").');
-          score -= 10;
-        }
-
-        score = Math.max(0, Math.min(100, score));
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  copyScore: score,
-                  qualityGrade: score >= 85 ? 'A (Excellent DR Ad)' : score >= 70 ? 'B (Good Copy)' : score >= 50 ? 'C (Needs Optimization)' : 'D (Weak Direct Response)',
-                  warnings,
-                  suggestions,
-                  summary: {
-                    headlineLength: headline.length,
-                    hasPrice: priceBadge.length > 0,
-                    hasReassuranceTrigger: hasReassurance,
-                    hasUrgencyTrigger: hasUrgency,
-                  },
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      default:
-        throw new Error(`Unknown tool name: ${name}`);
-    }
-  } catch (error) {
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `Error executing tool "${name}": ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
-    };
-  }
-});
-
-/**
- * Start the MCP Server using Standard I/O Transport
- */
-async function runServer() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('[MCP Server] SuperAds Creative Engine MCP server v2.0 running on stdio.');
-}
-
-runServer().catch(err => {
-  console.error('[MCP Server] Fatal initialization error:', err);
-  process.exit(1);
-});
