@@ -21,6 +21,7 @@
     "@google/genai": "^2.8.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@resvg/resvg-js": "^2.6.2",
+    "@supabase/supabase-js": "^2.115.0",
     "fabric": "^6.0.0",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",

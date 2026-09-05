@@ -82,7 +82,29 @@ const templateLayers: Record<TemplateId, { key: string; name: string; type: 'tex
   ],
   'custom': [
     { key: 'canvasBgColor', name: 'Canvas Background', type: 'color' },
-  ]
+  ],
+  'hd-red-circle': [
+    { key: 'subjectImage', name: 'Subject Photo', type: 'image' },
+    { key: 'mysteryImage', name: 'Mystery Inset', type: 'image' },
+    { key: 'headlineWhite', name: 'Headline (White)', type: 'text' },
+    { key: 'headlineYellow', name: 'Headline (Yellow)', type: 'text' },
+    { key: 'footerReassurance', name: 'Footer Tag', type: 'text' },
+  ],
+  'hd-breaking-news': [
+    { key: 'backgroundImage', name: 'Background Image', type: 'image' },
+    { key: 'alertBadgeText', name: 'Alert Badge', type: 'text' },
+    { key: 'sourceText', name: 'Source Header', type: 'text' },
+    { key: 'headline', name: 'News Headline', type: 'text' },
+    { key: 'subtitle', name: 'Subtitle', type: 'text' },
+  ],
+  'hd-native-alert': [
+    { key: 'backgroundImage', name: 'Background Image', type: 'image' },
+    { key: 'senderName', name: 'Sender Name', type: 'text' },
+    { key: 'timestamp', name: 'Timestamp', type: 'text' },
+    { key: 'messageText', name: 'Message Text', type: 'text' },
+    { key: 'calloutBadge', name: 'Proof Badge', type: 'text' },
+    { key: 'bottomNotice', name: 'Bottom Callout', type: 'text' },
+  ],
 };
 
 // Draggable boundaries configuration (in 1080x1080 coordinate system)
@@ -117,6 +139,11 @@ const draggableConfigs: Record<TemplateId, DraggableLayer[]> = {
   ],
   '5-a': [],
   'custom': [],
+  'hd-red-circle': [
+    { key: 'mysteryImage', name: 'Mystery Inset', left: 650, top: 230, width: 260, height: 260 },
+  ],
+  'hd-breaking-news': [],
+  'hd-native-alert': [],
 };
 
 interface ChatMessage {

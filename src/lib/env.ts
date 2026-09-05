@@ -34,6 +34,12 @@ const RawEnvSchema = z.object({
   R2_BUCKET_NAME: z.string().optional().default(''),
   R2_PUBLIC_URL: z.string().optional().default(''),
   NEXT_PUBLIC_R2_PUBLIC_URL: z.string().optional().default(''),
+  // Supabase Database (Optional, with in-memory fallback)
+  SUPABASE_URL: z.string().optional().default(''),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(''),
+  SUPABASE_ANON_KEY: z.string().optional().default(''),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().optional().default(''),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof RawEnvSchema>;
@@ -159,3 +165,15 @@ export function getR2PublicUrl(): string {
   const url = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || (typeof env !== 'undefined' ? (env.NEXT_PUBLIC_R2_PUBLIC_URL || env.R2_PUBLIC_URL) : '');
   return (url || '').replace(/\/+$/, '');
 }
+
+export function isSupabaseConfigured(): boolean {
+  const url = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const key = (
+    env.SUPABASE_SERVICE_ROLE_KEY ||
+    env.SUPABASE_ANON_KEY ||
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    ''
+  ).trim();
+  return Boolean(url && key && !PLACEHOLDER_VALUES.has(url) && !PLACEHOLDER_VALUES.has(key));
+}
+

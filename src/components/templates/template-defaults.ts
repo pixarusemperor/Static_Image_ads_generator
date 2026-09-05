@@ -132,5 +132,29 @@ export const defaultTemplatesData: Record<TemplateId, Record<string, any>> = {
         borderRadius: 35,
       }
     ]
-  }
+  },
+  'hd-red-circle': {
+    subjectImage: "/templates/assets/subject_speaker.png",
+    mysteryImage: "/templates/assets/33.png",
+    headlineWhite: "DATA LEAK:",
+    headlineYellow: "WHY TOP AGENCIES ARE HIDING THIS PROTOCOL",
+    circlePos: { cx: 780, cy: 360, r: 130 },
+    arrowPath: { start: [670, 420], end: [360, 520], curvature: -45 },
+    footerReassurance: "CONFIDENTIAL REPORT · SOURCE: INTERNAL AUDIT",
+  },
+  'hd-breaking-news': {
+    backgroundImage: "/templates/assets/zuck_news_bg.jpg",
+    alertBadgeText: "BREAKING NEWS",
+    headline: "LEAKED MEMO EXPOSES [42M ALGORITHM SHIFT] FORCING IMMEDIATE ACTION",
+    subtitle: "Independent audits confirm 3 out of 4 established accounts lost tracking visibility overnight.",
+    sourceText: "CONSUMER REPORT · INVESTIGATION",
+  },
+  'hd-native-alert': {
+    backgroundImage: "/templates/assets/subject_couple.png",
+    senderName: "Dr. Koffi",
+    timestamp: "Today 2:45 PM",
+    messageText: "The new batch cleared the test group in 48 hours. We recorded a 94.2% success rate with zero side effects. Do not leak this yet!",
+    calloutBadge: "VERIFIED SMS ALERT",
+    bottomNotice: "Tap to view full message thread • 100% Confidential",
+  },
 };

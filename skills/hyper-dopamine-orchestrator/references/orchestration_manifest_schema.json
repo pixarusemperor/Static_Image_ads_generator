@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CampaignAssetManifest",
+  "type": "object",
+  "required": [
+    "manifestVersion",
+    "campaignId",
+    "timestamp",
+    "strategy",
+    "adCreatives",
+    "feedCopy",
+    "compliance",
+    "landingPageBridge"
+  ],
+  "properties": {
+    "manifestVersion": { "type": "string", "enum": ["1.0.0"] },
+    "campaignId": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "strategy": {
+      "type": "object",
+      "required": ["unawareProblem", "nueephMechanism", "chosenAngle"],
+      "properties": {
+        "unawareProblem": { "type": "string" },
+        "nueephMechanism": {
+          "type": "object",
+          "required": ["name", "classification", "tactileMysteryObject", "oddNumberMetric"],
+          "properties": {
+            "name": { "type": "string" },
+            "classification": { "type": "string" },
+            "tactileMysteryObject": { "type": "string" },
+            "oddNumberMetric": { "type": "string" }
+          }
+        },
+        "chosenAngle": {
+          "type": "object",
+          "required": ["archetypeId", "headline", "newsHook", "honeyPolarityScore"],
+          "properties": {
+            "archetypeId": {
+              "type": "string",
+              "enum": [
+                "whistleblower",
+                "accidental_discovery",
+                "authority_counterpunch",
+                "secret_geography",
+                "warning_new_era"
+              ]
+            },
+            "headline": { "type": "string" },
+            "newsHook": { "type": "string" },
+            "honeyPolarityScore": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "adCreatives": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["templateId", "templateName", "assemblePayload", "visualDirectives"],
+        "properties": {
+          "templateId": { "type": "string" },
+          "templateName": { "type": "string" },
+          "assemblePayload": {
+            "type": "object",
+            "required": ["templateId", "variables"],
+            "properties": {
+              "templateId": { "type": "string" },
+              "variables": { "type": "object" },
+              "uploadToR2": { "type": "boolean" }
+            }
+          },
+          "visualDirectives": {
+            "type": "object",
+            "required": ["prompt", "subjectCenteringRequired", "mysteryObjectFocalPoint"],
+            "properties": {
+              "prompt": { "type": "string" },
+              "subjectCenteringRequired": { "type": "boolean" },
+              "mysteryObjectFocalPoint": { "type": "string" },
+              "overlays": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "feedCopy": {
+      "type": "object",
+      "required": ["primaryText", "headline", "description", "callToAction", "metrics"],
+      "properties": {
+        "primaryText": { "type": "string" },
+        "headline": { "type": "string", "maxLength": 40 },
+        "description": { "type": "string" },
+        "callToAction": { "type": "string", "enum": ["Learn More"] },
+        "metrics": {
+          "type": "object",
+          "required": ["readabilityGrade", "zeroYouCompliant", "characterCount"],
+          "properties": {
+            "readabilityGrade": { "type": "number", "maximum": 5.0 },
+            "zeroYouCompliant": { "type": "boolean", "enum": [true] },
+            "characterCount": { "type": "integer", "maximum": 2200 }
+          }
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "required": ["policyScore", "flaggedTerms", "safeHarborApplied"],
+      "properties": {
+        "policyScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "flaggedTerms": { "type": "array", "items": { "type": "string" } },
+        "safeHarborApplied": { "type": "boolean" }
+      }
+    },
+    "landingPageBridge": {
+      "type": "object",
+      "required": ["targetUrl", "preHeadlineTicker", "h1Headline", "subhead", "openingNarrativeBridge", "scentMatchScore"],
+      "properties": {
+        "targetUrl": { "type": "string", "format": "uri" },
+        "preHeadlineTicker": { "type": "string" },
+        "h1Headline": { "type": "string" },
+        "subhead": { "type": "string" },
+        "openingNarrativeBridge": { "type": "array", "items": { "type": "string" } },
+        "scentMatchScore": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    }
+  }
+}

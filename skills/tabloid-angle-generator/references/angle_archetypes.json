@@ -1,0 +1,87 @@
+[
+  {
+    "id": "whistleblower",
+    "name": "The Whistleblower / Leak",
+    "psychologicalTrigger": "Confidential insider revelation; bypassing institutional gatekeepers",
+    "headlineFormulas": [
+      "INDUSTRY INSIDER BREAKS SILENCE ON [MECHANISM]",
+      "FORMER [EXECUTIVE/ROLE] LEAKS 2026 [ASSET] PROTOCOL",
+      "REVEALED: THE CONFIDENTIAL [TOOL] SAVING [GROUP] [ODD METRIC]"
+    ],
+    "bannerFormulas": {
+      "whiteText": "DATA LEAK:",
+      "accentText": "The Unmarked [Object] Uncovering [Metric]"
+    },
+    "positiveHoneyAdjustment": "Frame the leak as a positive democratization of value (saving money, reclaiming time) rather than malice or destruction.",
+    "visualCue": "Subject pointing to redacted documents, holding unmarked hardware, or reviewing highlighted spreadsheets.",
+    "safeHarborTranslation": "Shift from 'This feels illegal' to 'Why industry whistleblowers are sharing this 2026 workflow data.'"
+  },
+  {
+    "id": "accidental_discovery",
+    "name": "The Accidental Discovery",
+    "psychologicalTrigger": "Serendipity; finding a hidden fortune during mundane daily tasks",
+    "headlineFormulas": [
+      "[ROLE] SPOTS BIZARRE [GLITCH/HABIT] UNLOCKING [ODD METRIC]",
+      "ROUTINE AUDIT ACCIDENTALLY REVEALS [PROPRIETARY RESULT]",
+      "HOW 1 CASUAL TEST DELIVERED [SPECIFIC GAIN] IN [TIME]"
+    ],
+    "bannerFormulas": {
+      "whiteText": "ACCIDENTAL FIND:",
+      "accentText": "How 1 Setting Unlocked [Odd Metric]"
+    },
+    "positiveHoneyAdjustment": "Focus on the delightful shock of unexpected surplus, free time, or unexpected profits.",
+    "visualCue": "Candid photo showing candid expression of surprise, holding a crumpled paper or pointing to a highlighted laptop screen.",
+    "safeHarborTranslation": "Ensure results are framed as a specific case study rather than a guaranteed overnight miracle."
+  },
+  {
+    "id": "authority_counterpunch",
+    "name": "The Authority Counter-Punch",
+    "psychologicalTrigger": "David vs. Goliath; challenging legacy gatekeepers with empirical proof",
+    "headlineFormulas": [
+      "WHY [LEGACY GIANTS] ARE ALARMED BY THIS $0 [MECHANISM]",
+      "CONTRARIAN STUDY QUESTIONS [POPULAR INDUSTRY ADVICE]",
+      "VETERAN EXPERTS STUNNED BY NEW [ODD METRIC] BENCHMARK"
+    ],
+    "bannerFormulas": {
+      "whiteText": "EXPERT DEBATE:",
+      "accentText": "Legacy Methods Questioned by Data"
+    },
+    "positiveHoneyAdjustment": "Frame the breakthrough as a triumph of modern efficiency for regular practitioners over bloated legacy monopolies.",
+    "visualCue": "Side-by-side split screen showing old cumbersome method vs. single sleek physical Mystery Object.",
+    "safeHarborTranslation": "Avoid naming specific competitors in a defamatory manner; use generic industry descriptors ('traditional agencies', 'legacy software')."
+  },
+  {
+    "id": "secret_geography",
+    "name": "The Secret Geography / Asset",
+    "psychologicalTrigger": "Exclusive access to an overlooked or unindexed reserve",
+    "headlineFormulas": [
+      "THE UNLISTED [DATABASE/ASSET] GENERATING [ODD METRIC]",
+      "WHY SMART [GROUP] ARE RETIRING TO THIS HIDDEN [MECHANISM]",
+      "THE OVERLOOKED [OBJECT] RESPONSIBLE FOR [SPECIFIC BENEFIT]"
+    ],
+    "bannerFormulas": {
+      "whiteText": "PRIVATE ASSET:",
+      "accentText": "The Unlisted [Object] Delivering [Metric]"
+    },
+    "positiveHoneyAdjustment": "Emphasize abundant opportunity and rapid adoption by early movers.",
+    "visualCue": "Subject examining a physical map, blueprint, binder, or unmarked folder with a neon highlighter.",
+    "safeHarborTranslation": "Ensure all unlisted assets or databases are described factually without implying black-hat or hacked data."
+  },
+  {
+    "id": "warning_new_era",
+    "name": "The Warning / New Era",
+    "psychologicalTrigger": "Paradigm evolution; impending transition to an inescapable new standard",
+    "headlineFormulas": [
+      "WHY [GROUP] ARE QUIETLY RETIRING [OLD METHOD] BEFORE [YEAR]",
+      "2026 NOTICE: THE QUIET SHIFT TO [MECHANISM NAME]",
+      "WHY [INSTITUTION] PROTOCOLS ARE RAPIDLY EVOLVING"
+    ],
+    "bannerFormulas": {
+      "whiteText": "2026 NOTICE:",
+      "accentText": "The Quiet Shift to [Mechanism]"
+    },
+    "positiveHoneyAdjustment": "Position early adopters as gaining unprecedented peace of mind, high margins, and total workflow control.",
+    "visualCue": "Calendar with date circled in red marker or laptop showing clean automated dashboard.",
+    "safeHarborTranslation": "Frame warnings as informative industry forecasts rather than apocalyptic ultimatums."
+  }
+]

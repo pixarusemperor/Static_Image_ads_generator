@@ -121,7 +121,45 @@ export const TEMPLATES_REGISTRY: TemplateMetadata[] = [
     tags: ['Custom Layers', 'Freeform', 'Fabric.js'],
     elementCount: 4,
   },
+  {
+    id: 'hd-red-circle',
+    name: 'HD-1: Red Circle & Jitter Arrow',
+    category: 'direct-response',
+    categoryLabel: 'Direct-Response',
+    description: 'Sabri Suby pattern-interrupt layout with hand-drawn red markup circle, curved Bezier jitter arrow, and chromatic tabloid breaking news banner.',
+    thumbnailUrl: '/templates/thumbnails/1-a.png',
+    badge: 'Sabri Suby',
+    dimensions: { width: 1080, height: 1080 },
+    tags: ['Red Circle', 'Jitter Arrow', 'News Banner', 'Pattern Interrupt'],
+    elementCount: 5,
+  },
+  {
+    id: 'hd-breaking-news',
+    name: 'HD-2: Tabloid Breaking News Card',
+    category: 'publisher',
+    categoryLabel: 'Publisher',
+    description: 'Broadcast-grade news card with pulsing red alert badge pill, atmospheric photo background, and high-impact lower third news ticker.',
+    thumbnailUrl: '/templates/thumbnails/2-a.png',
+    badge: 'Breaking News',
+    dimensions: { width: 1080, height: 1080 },
+    tags: ['Breaking News', 'Pill Badge', 'Lower Third', 'Exposé'],
+    elementCount: 5,
+  },
+  {
+    id: 'hd-native-alert',
+    name: 'HD-3: Native SMS / Notification Overlay',
+    category: 'social',
+    categoryLabel: 'Social Native',
+    description: 'Authentic candid lifestyle photo with floating iOS translucent chat notification bubble, verified badge, and odd-number conversational proof.',
+    thumbnailUrl: '/templates/thumbnails/3-b.png',
+    badge: 'Native SMS',
+    dimensions: { width: 1080, height: 1080 },
+    tags: ['iOS Alert', 'SMS Bubble', 'Social Proof', 'Candid Photo'],
+    elementCount: 6,
+  },
 ];
+
+export const templateRegistry = TEMPLATES_REGISTRY;
 
 export function getTemplateMetadata(id: TemplateId): TemplateMetadata | undefined {
   return TEMPLATES_REGISTRY.find(t => t.id === id);

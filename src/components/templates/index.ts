@@ -7,6 +7,9 @@ import { Template3B, Template3BProps } from './Template3B';
 import { Template4A, Template4AProps } from './Template4A';
 import { Template5A, Template5AProps } from './Template5A';
 import { CustomTemplate, CustomTemplateProps } from './CustomTemplate';
+import { TemplateHDRedCircle, TemplateHDRedCircleProps } from './TemplateHDRedCircle';
+import { TemplateHDBreakingNews, TemplateHDBreakingNewsProps } from './TemplateHDBreakingNews';
+import { TemplateHDNativeAlert, TemplateHDNativeAlertProps } from './TemplateHDNativeAlert';
 
 export {
   Template1A,
@@ -17,6 +20,9 @@ export {
   Template4A,
   Template5A,
   CustomTemplate,
+  TemplateHDRedCircle,
+  TemplateHDBreakingNews,
+  TemplateHDNativeAlert,
 };
 
 export type {
@@ -28,9 +34,23 @@ export type {
   Template4AProps,
   Template5AProps,
   CustomTemplateProps,
+  TemplateHDRedCircleProps,
+  TemplateHDBreakingNewsProps,
+  TemplateHDNativeAlertProps,
 };
 
-export type TemplateId = '1-a' | '1-b' | '2-a' | '3-a' | '3-b' | '4-a' | '5-a' | 'custom';
+export type TemplateId =
+  | '1-a'
+  | '1-b'
+  | '2-a'
+  | '3-a'
+  | '3-b'
+  | '4-a'
+  | '5-a'
+  | 'custom'
+  | 'hd-red-circle'
+  | 'hd-breaking-news'
+  | 'hd-native-alert';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const templatesMap: Record<TemplateId, React.ComponentType<any>> = {
@@ -42,6 +62,9 @@ export const templatesMap: Record<TemplateId, React.ComponentType<any>> = {
   '4-a': Template4A,
   '5-a': Template5A,
   'custom': CustomTemplate,
+  'hd-red-circle': TemplateHDRedCircle,
+  'hd-breaking-news': TemplateHDBreakingNews,
+  'hd-native-alert': TemplateHDNativeAlert,
 };
 
 // Default width and height for each template type
@@ -54,6 +77,9 @@ export const templatesDimensions: Record<TemplateId, { width: number; height: nu
   '4-a': { width: 1080, height: 1080 },
   '5-a': { width: 1080, height: 1080 },
   'custom': { width: 1080, height: 1080 },
+  'hd-red-circle': { width: 1080, height: 1080 },
+  'hd-breaking-news': { width: 1080, height: 1080 },
+  'hd-native-alert': { width: 1080, height: 1080 },
 };
 
 /**

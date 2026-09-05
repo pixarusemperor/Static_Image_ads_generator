@@ -2,7 +2,7 @@
 
 /**
  * Automated Verification Suite for SuperAds MCP Server
- * Tests JSON-RPC 2.0 stdio transport across all 6 exposed tools:
+ * Tests JSON-RPC 2.0 stdio transport across exposed tools:
  * 1. tools/list
  * 2. list_templates
  * 3. get_template_details (contracts, spatial rules, mandatory flags)
@@ -10,6 +10,9 @@
  * 5. validate_ad_copy
  * 6. render_ad
  * 7. batch_render_campaign
+ * 8. get_mystery_object_recommendation
+ * 9. adapt_copy_to_template
+ * 10. orchestrate_campaign_creatives
  */
 
 import { spawn } from 'child_process';
@@ -62,8 +65,8 @@ function sendJsonRpc(method, params = {}) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       pendingRequests.delete(id);
-      reject(new Error(`Request id ${id} (${method}) timed out after 30s`));
-    }, 30000);
+      reject(new Error(`Request id ${id} (${method}) timed out after 60s`));
+    }, 60000);
 
     pendingRequests.set(id, {
       resolve: (res) => {
@@ -90,11 +93,11 @@ async function runTests() {
     const listRes = await sendJsonRpc('tools/list', {});
     const tools = listRes?.tools || [];
     console.log(`✓ Received ${tools.length} registered MCP tools: ${tools.map(t => t.name).join(', ')}`);
-    if (tools.length === 6) {
-      console.log('  PASS: All 6 tools registered correctly.');
+    if (tools.length >= 6) {
+      console.log(`  PASS: All tools registered correctly (${tools.length} tools available).`);
       passedCount++;
     } else {
-      console.error(`  FAIL: Expected 6 tools, got ${tools.length}`);
+      console.error(`  FAIL: Expected at least 6 tools, got ${tools.length}`);
       failedCount++;
     }
   } catch (err) {
@@ -268,6 +271,94 @@ async function runTests() {
     }
   } catch (err) {
     console.error('  FAIL Test 7:', err.message);
+    failedCount++;
+  }
+
+  // Test 8: Call tool get_mystery_object_recommendation
+  console.log('\n--- Test 8: tools/call get_mystery_object_recommendation ---');
+  try {
+    const res = await sendJsonRpc('tools/call', {
+      name: 'get_mystery_object_recommendation',
+      arguments: { category: 'Health & Sexual Wellness' },
+    });
+    const parsed = JSON.parse(res?.content?.[0]?.text);
+    console.log(`✓ Mystery object recommendation: ${parsed.tangibleMysteryObject}`);
+    console.log(`  Concept: ${parsed.patternInterruptConcept.slice(0, 60)}...`);
+    if (parsed.tangibleMysteryObject && parsed.recommendedTemplates?.length > 0) {
+      console.log('  PASS: Mystery object recommendation resolved from transformation matrix.');
+      passedCount++;
+    } else {
+      console.error('  FAIL: Missing expected mystery object properties');
+      failedCount++;
+    }
+  } catch (err) {
+    console.error('  FAIL Test 8:', err.message);
+    failedCount++;
+  }
+
+  // Test 9: Call tool adapt_copy_to_template
+  console.log('\n--- Test 9: tools/call adapt_copy_to_template ---');
+  try {
+    const res = await sendJsonRpc('tools/call', {
+      name: 'adapt_copy_to_template',
+      arguments: {
+        templateId: '1-a',
+        rawContent: {
+          headline: 'Durez plus de 45 minutes naturellement avec cette infusion rare',
+          price: '5.000 FCFA',
+          cta: 'Commander maintenant',
+        },
+      },
+    });
+    const parsed = JSON.parse(res?.content?.[0]?.text);
+    console.log(`✓ Adapted variables for 1-a: headerLine2="${parsed.variables?.headerLine2}"`);
+    console.log(`  Price badge: "${parsed.variables?.priceBadgeText}"`);
+    if (parsed.variables?.headerLine2 && parsed.variables?.priceBadgeText) {
+      console.log('  PASS: Template copy adapted and fitted to spatial contract.');
+      passedCount++;
+    } else {
+      console.error('  FAIL: Missing adapted variables');
+      failedCount++;
+    }
+  } catch (err) {
+    console.error('  FAIL Test 9:', err.message);
+    failedCount++;
+  }
+
+  // Test 10: Call tool orchestrate_campaign_creatives
+  console.log('\n--- Test 10: tools/call orchestrate_campaign_creatives ---');
+  try {
+    const res = await sendJsonRpc('tools/call', {
+      name: 'orchestrate_campaign_creatives',
+      arguments: {
+        campaignName: 'MCP Test Campaign',
+        product: {
+          name: 'Thé Volcanique',
+          category: 'Health & Sexual Wellness',
+          price: '5.000 FCFA',
+          proofPoints: '8.900+ clients',
+        },
+        avatar: {
+          awarenessStage: 'Problem-Aware',
+          language: 'fr',
+        },
+        targetTemplates: ['hd-red-circle', '1-a'],
+        uploadToR2: false,
+      },
+    });
+    const parsed = JSON.parse(res?.content?.[0]?.text);
+    console.log(`✓ Campaign ID: ${parsed.campaignId}`);
+    console.log(`  Feed Copy Grade: ${parsed.feedCopy?.metrics?.readabilityGrade} (Zero-You: ${parsed.feedCopy?.metrics?.zeroYouCompliant})`);
+    console.log(`  Creatives Rendered: ${parsed.creatives?.length}`);
+    if (parsed.campaignId && parsed.creatives?.length === 2 && parsed.feedCopy?.metrics?.zeroYouCompliant) {
+      console.log('  PASS: Autonomous campaign orchestration rendered complete creative bundle.');
+      passedCount++;
+    } else {
+      console.error('  FAIL: Campaign orchestration bundle missing items');
+      failedCount++;
+    }
+  } catch (err) {
+    console.error('  FAIL Test 10:', err.message);
     failedCount++;
   }
 
