@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGenAIClient, getGenAIModel } from '@/utils/ai';
+import { getGenAIClient, discoverBestVisionModel } from '@/utils/ai';
+import { resolveDynamicGeminiKey } from '@/lib/env';
+import { recordTokenUsage } from '@/utils/token-tracker';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  let filename = '';
+
   try {
     let imageBase64 = '';
     let mimeType = 'image/png';
-    let filename = '';
 
     // 1. Parse request body
     const contentTypeHeader = request.headers.get('content-type') || '';
@@ -30,29 +35,41 @@ export async function POST(request: NextRequest) {
       filename = name || '';
 
       if (image.startsWith('data:')) {
-        const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        const matches = image.match(/^data:([A-Za-z-+\/]+);base64,([\s\S]+)$/);
         if (matches && matches.length === 3) {
           mimeType = matches[1];
-          imageBase64 = matches[2];
+          imageBase64 = matches[2].replace(/\s/g, '');
         } else {
           return NextResponse.json({ error: 'Invalid data URL format' }, { status: 400 });
         }
       } else {
-        imageBase64 = image;
+        imageBase64 = image.replace(/\s/g, '');
       }
     }
 
-    // 2. Initialize Google Gen AI client
+    // 2. Resolve Gemini API key dynamically (header -> env -> ambient token)
+    const keyResolution = resolveDynamicGeminiKey(request.headers);
+    if (!keyResolution) {
+      console.warn('[Analyze] No Gemini API key configured. Returning mock classification.');
+      const mockResult = getMockClassification(filename);
+      return NextResponse.json({
+        ...mockResult,
+        warning: 'No Gemini API key provided. Using fallback layout.',
+      });
+    }
+
     let ai;
+    let model = 'gemini-2.5-flash';
     try {
-      ai = getGenAIClient();
-    } catch (e) {
-      console.warn('Gen AI Client could not be initialized. Returning mock classification layout.', e);
+      ai = getGenAIClient({ apiKey: keyResolution.key });
+      model = await discoverBestVisionModel(ai);
+    } catch (e: any) {
+      console.warn('[Analyze] Gen AI Client could not be initialized:', e.message);
       const mockResult = getMockClassification(filename);
       return NextResponse.json(mockResult);
     }
 
-    // 4. Construct prompt
+    // 3. Construct prompt
     const prompt = `You are an expert direct-response marketing design analysis AI. 
 Analyze the uploaded advertisement image and:
 1. Classify it into exactly one of these 7 template layout categories:
@@ -67,7 +84,7 @@ Analyze the uploaded advertisement image and:
 2. Extract all the textual content, badge texts, stats, and custom colors present in the image and place them in the corresponding variables object:
    - For "1-a": headerLine1, headerLine2, priceBadgeText, footerLine1, footerLine2.
    - For "1-b": priceBadgeText, title, subtitle, bodyParagraph, footerText.
-   - For "2-a": headline (include brackets [around high-intensity words] to highlight them, e.g., "CETTE HABITUDE [TUE] VOTRE CELLULE"), highlightColor (hex code, default #E50914), logoPosition ('left' or 'right'), hasAvatar (true/false).
+   - For "2-a": headline (include brackets [around high-intensity words] to highlight them, e.g., "CETTE HABITUDE [TUE] VOTRE FOIE"), highlightColor (hex code, default #E50914), logoPosition ('left' or 'right'), hasAvatar (true/false).
    - For "3-a": headline, badgeText.
    - For "3-b": postAuthor, postHandle, postContent, postStats.
    - For "4-a": headerTitle, footerSalary, footerCommissions.
@@ -79,9 +96,9 @@ Return a JSON object with:
   "variables": { ... }
 }`;
 
-    // 3. Call Gemini API using structured JSON output
+    // 4. Call Gemini API using structured JSON output
     const response = await ai.models.generateContent({
-      model: getGenAIModel(),
+      model,
       contents: [
         {
           role: 'user',
@@ -98,52 +115,23 @@ Return a JSON object with:
       ],
       config: {
         responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            templateId: {
-              type: 'STRING',
-              enum: ['1-a', '1-b', '2-a', '3-a', '3-b', '4-a', '5-a'],
-              description: 'The classified template layout ID.',
-            },
-            variables: {
-              type: 'OBJECT',
-              description: 'Key-value pairs representing the text and style variables extracted.',
-              properties: {
-                headerLine1: { type: 'STRING' },
-                headerLine2: { type: 'STRING' },
-                priceBadgeText: { type: 'STRING' },
-                footerLine1: { type: 'STRING' },
-                footerLine2: { type: 'STRING' },
-                title: { type: 'STRING' },
-                subtitle: { type: 'STRING' },
-                bodyParagraph: { type: 'STRING' },
-                footerText: { type: 'STRING' },
-                headline: { type: 'STRING' },
-                highlightColor: { type: 'STRING' },
-                logoPosition: { type: 'STRING' },
-                hasAvatar: { type: 'BOOLEAN' },
-                badgeText: { type: 'STRING' },
-                postAuthor: { type: 'STRING' },
-                postHandle: { type: 'STRING' },
-                postContent: { type: 'STRING' },
-                postStats: { type: 'STRING' },
-                headerTitle: { type: 'STRING' },
-                footerSalary: { type: 'STRING' },
-                footerCommissions: { type: 'STRING' },
-                backgroundColor: { type: 'STRING' },
-                subjectImage: { type: 'STRING' },
-                productImage: { type: 'STRING' },
-                backgroundImage: { type: 'STRING' },
-                avatarUrl: { type: 'STRING' },
-                logoUrl: { type: 'STRING' },
-                bodyImage: { type: 'STRING' },
-              }
-            },
-          },
-          required: ['templateId', 'variables'],
-        },
       },
+    });
+
+    const promptTokens = response.usageMetadata?.promptTokenCount || 0;
+    const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
+    const durationMs = Date.now() - startTime;
+
+    const telemetry = await recordTokenUsage({
+      task: 'ad_classification_analysis',
+      source: (request.headers.get('x-superads-source') as any) || 'web',
+      agentId: request.headers.get('x-superads-agent-id') || undefined,
+      campaignId: request.headers.get('x-superads-campaign-id') || undefined,
+      model,
+      promptTokens,
+      candidatesTokens,
+      totalTokens: promptTokens + candidatesTokens,
+      latencyMs: durationMs,
     });
 
     const textResponse = response.text;
@@ -151,13 +139,23 @@ Return a JSON object with:
       throw new Error('Empty response from Gemini');
     }
 
-    const jsonResult = JSON.parse(textResponse);
-    return NextResponse.json(jsonResult);
+    const cleanJson = textResponse.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
+    const jsonResult = JSON.parse(cleanJson);
+
+    return NextResponse.json({
+      ...jsonResult,
+      _telemetry: telemetry,
+    }, {
+      headers: {
+        'X-Tokens-Prompt': String(promptTokens),
+        'X-Tokens-Completion': String(candidatesTokens),
+        'X-Estimated-Cost-USD': String(telemetry.estimatedCostUsd || 0),
+      },
+    });
 
   } catch (error: unknown) {
     console.error('Error in analyze API route:', error);
-    // If Gemini fails, return a graceful mock response instead of throwing a 500, to keep the app functional
-    const mockResult = getMockClassification('');
+    const mockResult = getMockClassification(filename);
     return NextResponse.json({
       ...mockResult,
       warning: 'Failed to connect to Gemini API. Returned fallback mock layout.',
@@ -166,9 +164,6 @@ Return a JSON object with:
   }
 }
 
-/**
- * Returns a mock classification based on the filename or defaults to a common template.
- */
 function getMockClassification(filename: string) {
   const nameLower = filename.toLowerCase();
 

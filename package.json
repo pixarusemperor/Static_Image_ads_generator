@@ -2,6 +2,9 @@
   "name": "static-image-ads-generator",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "superads": "./bin/superads"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

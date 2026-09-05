@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { z } from 'zod';
 
 const PLACEHOLDER_VALUES = new Set([
@@ -56,15 +58,88 @@ export function hasGeminiApiKey(): boolean {
   return !PLACEHOLDER_VALUES.has(env.GEMINI_API_KEY);
 }
 
+/**
+ * Resolves the active Gemini API key using a 5-tier fallback cascade:
+ * 1. Request Header: 'x-gemini-api-key' (client UI / API callers)
+ * 2. Request Header: 'Authorization: Bearer <key>'
+ * 3. JSON Request Body: 'apiKey'
+ * 4. Live runtime process.env.GEMINI_API_KEY (supports changes without restart)
+ * 5. Ambient Antigravity CLI Google Cloud Code Assist token (~/.bashrc)
+ * 6. Validated startup env.GEMINI_API_KEY
+ */
+export function resolveDynamicGeminiKey(
+  reqHeaders?: Headers | Record<string, string | null | undefined>,
+  reqBody?: Record<string, any>
+): { key: string; source: 'header' | 'bearer' | 'body' | 'env_live' | 'ambient_agy' | 'env_startup' } | null {
+  // 1. Check Header 'x-gemini-api-key'
+  if (reqHeaders) {
+    const headerKey = typeof (reqHeaders as Headers).get === 'function'
+      ? (reqHeaders as Headers).get('x-gemini-api-key')
+      : (reqHeaders as Record<string, string | null | undefined>)['x-gemini-api-key'];
+    if (headerKey && !PLACEHOLDER_VALUES.has(headerKey.trim())) {
+      return { key: headerKey.trim(), source: 'header' };
+    }
+
+    // 2. Check Authorization Bearer
+    const authHeader = typeof (reqHeaders as Headers).get === 'function'
+      ? (reqHeaders as Headers).get('authorization')
+      : (reqHeaders as Record<string, string | null | undefined>)['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      if (token && !PLACEHOLDER_VALUES.has(token)) {
+        return { key: token, source: 'bearer' };
+      }
+    }
+  }
+
+  // 3. Check Request Body
+  if (reqBody && typeof reqBody.apiKey === 'string') {
+    const bodyKey = reqBody.apiKey.trim();
+    if (bodyKey && !PLACEHOLDER_VALUES.has(bodyKey)) {
+      return { key: bodyKey, source: 'body' };
+    }
+  }
+
+  // 4. Check Live Runtime process.env.GEMINI_API_KEY
+  const liveEnvKey = process.env.GEMINI_API_KEY?.trim();
+  if (liveEnvKey && !PLACEHOLDER_VALUES.has(liveEnvKey)) {
+    return { key: liveEnvKey, source: 'env_live' };
+  }
+
+  // 5. Check Ambient Antigravity CLI Host Subscription Token
+  try {
+    if (typeof process !== 'undefined' && process.env.HOME) {
+      const bashrcPath = path.join(process.env.HOME, '.bashrc');
+      if (fs.existsSync(bashrcPath)) {
+        const content = fs.readFileSync(bashrcPath, 'utf-8');
+        const match = content.match(/export\s+GEMINI_API_KEY=["']?(AQ\.[a-zA-Z0-9_\-]+)["']?/);
+        if (match && match[1]) {
+          return { key: match[1], source: 'ambient_agy' };
+        }
+      }
+    }
+  } catch {
+    // ignore filesystem access errors in sandboxed containers
+  }
+
+  // 6. Check Validated Startup env
+  if (env.GEMINI_API_KEY && !PLACEHOLDER_VALUES.has(env.GEMINI_API_KEY.trim())) {
+    return { key: env.GEMINI_API_KEY.trim(), source: 'env_startup' };
+  }
+
+  return null;
+}
+
 export function requireGeminiApiKey(): string {
-  if (!hasGeminiApiKey()) {
+  const resolved = resolveDynamicGeminiKey();
+  if (!resolved) {
     throw new Error(
       '[env] GEMINI_API_KEY is not configured. ' +
-        'Set it in Coolify → Environment Variables, then redeploy. ' +
-        'Without it, AI-powered features (/api/assemble, /api/analyze) will fail.',
+        'Set it in the UI Settings modal, request headers (x-gemini-api-key), or Environment Variables. ' +
+        'Without it, AI-powered features will fail.',
     );
   }
-  return env.GEMINI_API_KEY;
+  return resolved.key;
 }
 
 export function getGcpProject(): string {

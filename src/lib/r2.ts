@@ -1,6 +1,8 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { env, isR2Configured, getR2PublicUrl } from './env';
 
+export { isR2Configured, getR2PublicUrl };
+
 let s3ClientInstance: S3Client | null = null;
 
 export function getR2Client(): S3Client | null {

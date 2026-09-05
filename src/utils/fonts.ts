@@ -1,11 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 
+// In-memory singleton font cache to avoid re-reading disk or re-fetching across render requests
+let cachedFonts: { regular: Buffer; bold: Buffer } | null = null;
+
 /**
- * Ensures that Inter-Regular and Inter-Bold (Lato fallback) TTF files exist
- * and are valid. If not, it fetches them from the google/fonts repository.
+ * Ensures that TTF font files exist and are valid, caching in memory for zero-latency subsequent calls.
  */
 export async function getFontBuffers(): Promise<{ regular: Buffer; bold: Buffer }> {
+  if (cachedFonts) {
+    return cachedFonts;
+  }
+
   const fontDir = path.join(process.cwd(), 'src/assets/fonts');
   if (!fs.existsSync(fontDir)) {
     fs.mkdirSync(fontDir, { recursive: true });
@@ -31,29 +37,32 @@ export async function getFontBuffers(): Promise<{ regular: Buffer; bold: Buffer 
   };
 
   if (!isValidTtf(regularPath)) {
-    console.log('Downloading regular font from Google Fonts...');
+    console.log('[Fonts] Downloading regular font from Google Fonts...');
     const res = await fetch(regularUrl);
     if (!res.ok) {
       throw new Error(`Failed to fetch regular font: ${res.statusText}`);
     }
     const arrayBuffer = await res.arrayBuffer();
     fs.writeFileSync(regularPath, Buffer.from(arrayBuffer));
-    console.log('Saved regular font.');
+    console.log('[Fonts] Saved regular font.');
   }
 
   if (!isValidTtf(boldPath)) {
-    console.log('Downloading bold font from Google Fonts...');
+    console.log('[Fonts] Downloading bold font from Google Fonts...');
     const res = await fetch(boldUrl);
     if (!res.ok) {
       throw new Error(`Failed to fetch bold font: ${res.statusText}`);
     }
     const arrayBuffer = await res.arrayBuffer();
     fs.writeFileSync(boldPath, Buffer.from(arrayBuffer));
-    console.log('Saved bold font.');
+    console.log('[Fonts] Saved bold font.');
   }
 
-  return {
+  cachedFonts = {
     regular: fs.readFileSync(regularPath),
     bold: fs.readFileSync(boldPath),
   };
+
+  return cachedFonts;
 }
+

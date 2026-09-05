@@ -4,9 +4,9 @@
  * Model Context Protocol (MCP) Server for SuperAds Creative Engine
  * Standalone Headless Static Ads Microservice
  * 
- * Exposes ad generation, template introspection, spatial composition rules,
- * and payload validation tools over standard stdio JSON-RPC for external
- * services (SYNPHONYS, Claude Desktop, Cursor, Antigravity CLI, n8n, Python).
+ * Exposes dynamic ad generation, dynamic template contract extraction,
+ * image deconstruction into templates, and payload validation over stdio JSON-RPC
+ * for external services (SYNPHONYS, Hermes, Claude Desktop, Cursor, Antigravity CLI).
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -21,681 +21,187 @@ import path from 'path';
 // Primary and fallback endpoints
 const LOCAL_ENDPOINT = process.env.ADS_API_URL || 'http://localhost:3000';
 const REMOTE_ENDPOINT = 'https://superads.orizongroup.online';
+const LOCAL_TEMPLATES_DIR = path.join(process.cwd(), 'data', 'templates');
+
+// Active live endpoint cache to avoid repeated timeout lags
+let cachedLiveEndpoint = null;
+let lastEndpointCheck = 0;
 
 /**
- * Complete Single Source of Truth Template Contracts
+ * Fast endpoint discovery with 1.2s timeout
  */
-const TEMPLATE_CONTRACTS = {
+async function getLiveEndpoint(customEndpoint) {
+  if (customEndpoint) return customEndpoint;
+  const now = Date.now();
+  if (cachedLiveEndpoint && (now - lastEndpointCheck < 30000)) {
+    return cachedLiveEndpoint;
+  }
+
+  const candidates = [LOCAL_ENDPOINT, REMOTE_ENDPOINT];
+  for (const ep of candidates) {
+    try {
+      const res = await fetch(`${ep.replace(/\/$/, '')}/api/templates`, {
+        signal: AbortSignal.timeout(1200),
+      });
+      if (res.ok) {
+        cachedLiveEndpoint = ep;
+        lastEndpointCheck = now;
+        return ep;
+      }
+    } catch {}
+  }
+
+  cachedLiveEndpoint = LOCAL_ENDPOINT;
+  return LOCAL_ENDPOINT;
+}
+
+/**
+ * Built-in static preset fallbacks if network is completely unreachable
+ */
+const BUILTIN_FALLBACK_CONTRACTS = {
   '1-a': {
     id: '1-a',
     name: '1-A: Niche Product (Default Dual Banner)',
     category: 'direct-response',
-    categoryLabel: 'Direct-Response Product',
-    description: 'Dual-banner header with left subject portrait, right 3D product mockup, high-contrast yellow price badge, and dual-tone bottom reassurance banners.',
-    bestUseCase: 'Physical e-commerce products with visceral pain-points: sexual wellness (Volcano Tea), dietary supplements, physical gadgets, skincare remedies where cash-on-delivery is standard.',
-    recommendedNiches: ['Sexual Wellness & Libido', 'Pain Relief & Supplements', 'Physical Gadgets', 'Beauty & Hair Regrowth'],
-    funnelStage: 'Problem-Aware',
-    conversionRationale: 'Top black banner qualifies audience -> red banner asks a painful visceral question stopping the thumb -> left subject photo creates emotional empathy -> 3D cutout mockup tangibilizes solution -> yellow pill anchors low price -> footer banners eliminate risk with Payment on Delivery.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
-      {
-        key: 'headerLine1',
-        label: 'Top Qualification Banner',
-        type: 'text',
-        mandatory: false,
-        defaultValue: 'INFUSION VOLCANIQUE 100% NATURELLE',
-        spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 100, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 2, maxWords: 6, maxCharacters: 40, fontSize: 44, fontWeight: 'bold' },
-        purpose: 'Audience qualification and category positioning in top black banner.',
-      },
-      {
-        key: 'headerLine2',
-        label: 'Visceral Problem Hook',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'SOUFFREZ-VOUS D\'ÉJACULATION PRÉCOCE ?',
-        spatial: { position: 'absolute', left: 0, top: 100, width: 1080, height: 110, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 8, maxCharacters: 45, fontSize: 52, fontWeight: 'bold' },
-        purpose: 'The primary scroll-stopping question on high-contrast red banner.',
-      },
-      {
-        key: 'subjectImage',
-        label: 'Left Subject / Symptom Portrait',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/MRESISTORFLYER1.png',
-        spatial: { position: 'absolute', left: 80, top: 240, width: 520, height: 620, borderRadius: 30 },
-        compositionRules: {
-          aspectRatio: '5:6',
-          format: 'portrait-photo',
-          subjectPlacement: 'CRITICAL: The person or symptom sufferer MUST BE CENTERED horizontally and vertically in the photo frame. Because objectFit is "cover", off-center subjects will have their head or face cut off by the rounded container.',
-          minResolution: { width: 600, height: 720 },
-        },
-        purpose: 'Human identification and visceral empathy anchor.',
-      },
-      {
-        key: 'productImage',
-        label: 'Right 3D Product Mockup',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/PATSIMMSCFLYER1.png',
-        spatial: { position: 'absolute', left: 660, top: 300, width: 330, height: 460 },
-        compositionRules: {
-          aspectRatio: '3:4',
-          format: 'transparent-png',
-          subjectPlacement: 'CRITICAL: Must be a clean 3D product mockup (box, bottle, bag, packaging) with a TRANSPARENT BACKGROUND (PNG). Product should be centered vertically with packaging label clearly readable.',
-          minResolution: { width: 400, height: 550 },
-        },
-        purpose: 'Tangible proof of the product vessel and perceived commercial value.',
-      },
-      {
-        key: 'priceBadgeText',
-        label: 'Offer / Price Pill',
-        type: 'badge',
-        mandatory: true,
-        defaultValue: 'PRIX : 5.000 FCFA',
-        spatial: { position: 'absolute', left: 650, top: 780, width: 350, height: 70, borderRadius: 15, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 24, fontSize: 32, fontWeight: 'bold' },
-        purpose: 'Eliminates price shock and anchors high-perceived-value deal on bright yellow pill.',
-      },
-      {
-        key: 'footerLine1',
-        label: 'Call to Action Banner',
-        type: 'text',
-        mandatory: false,
-        defaultValue: 'COMMANDEZ AUJOURD\'HUI & PAYEZ À LA LIVRAISON',
-        spatial: { position: 'absolute', left: 0, top: 880, width: 1080, height: 90, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 8, maxCharacters: 48, fontSize: 40, fontWeight: 'bold' },
-        purpose: 'Immediate direct action prompt emphasizing Cash on Delivery.',
-      },
-      {
-        key: 'footerLine2',
-        label: 'Trust & Reassurance Banner',
-        type: 'text',
-        mandatory: false,
-        defaultValue: 'LIVRAISON RAPIDE ET DISCRÈTE PARTOUT EN CÔTE D\'IVOIRE',
-        spatial: { position: 'absolute', left: 0, top: 970, width: 1080, height: 110, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 4, maxWords: 9, maxCharacters: 52, fontSize: 44, fontWeight: 'bold' },
-        purpose: 'Overcomes final friction (delivery speed, discretion, geographic availability).',
-      },
+      { key: 'headerLine1', label: 'Top Qualification Banner', type: 'text', mandatory: false, spatial: { left: 0, top: 0, width: 1080, height: 100 } },
+      { key: 'headerLine2', label: 'Visceral Problem Hook', type: 'text', mandatory: true, spatial: { left: 0, top: 100, width: 1080, height: 110 } },
+      { key: 'subjectImage', label: 'Left Subject / Symptom Portrait', type: 'image', mandatory: true, spatial: { left: 80, top: 240, width: 520, height: 620 } },
+      { key: 'productImage', label: 'Right 3D Product Mockup', type: 'image', mandatory: true, spatial: { left: 660, top: 300, width: 330, height: 460 } },
+      { key: 'priceBadgeText', label: 'Offer / Price Pill', type: 'badge', mandatory: true, spatial: { left: 650, top: 780, width: 350, height: 70 } },
     ],
   },
-
   '1-b': {
     id: '1-b',
-    name: '1-B: Niche Product (Split Copy)',
+    name: '1-B: Authority / Social Proof',
     category: 'direct-response',
-    categoryLabel: 'Direct-Response Editorial',
-    description: 'Hero photo top background with split sales copy on vibrant yellow backdrop, right-aligned product mockup, and green offer capsule.',
-    bestUseCase: 'Educational digital guides, e-books, specialized courses, boxed kits where the buyer needs a 2-sentence rationale before deciding.',
-    recommendedNiches: ['Info-Products & E-books', 'Training Courses', 'Complex Health Formulations', 'Premium High-Ticket Kits'],
-    funnelStage: 'Solution-Aware',
-    conversionRationale: 'Top hero photograph sets visual scene -> Yellow high-energy lower half creates a natural reading column -> Split headline + paragraph copy builds rational desire -> Floating 3D mockup proves tangible existence.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
-      {
-        key: 'topBackgroundImage',
-        label: 'Top Hero Background Photo',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/MRESISTORFLYER2.png',
-        spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 500 },
-        compositionRules: {
-          aspectRatio: '2.16:1 (1080x500)',
-          format: 'full-bleed-photo',
-          subjectPlacement: 'CRITICAL: Subject matter must be centered vertically within the top 500px. Avoid placing text in this image.',
-        },
-        purpose: 'Establishes high visual interest and context in the top half.',
-      },
-      {
-        key: 'productImage',
-        label: 'Floating Right Mockup',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/PATSIMMSCFLYER5.png',
-        spatial: { position: 'absolute', left: 780, top: 380, width: 230, height: 330 },
-        compositionRules: {
-          aspectRatio: '2:3',
-          format: 'transparent-png',
-          subjectPlacement: 'CRITICAL: 3D book or package cutout with transparent background.',
-        },
-        purpose: 'Provides tangible representation of the guide or product.',
-      },
-      {
-        key: 'priceBadgeText',
-        label: 'Green Price Capsule',
-        type: 'badge',
-        mandatory: true,
-        defaultValue: 'OFFRE LIMITÉE : 5.000 F',
-        spatial: { position: 'absolute', left: 740, top: 740, width: 310, height: 64, borderRadius: 32, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 26, fontSize: 26, fontWeight: 'bold' },
-        purpose: 'Urgency price anchor on green background (#00875A).',
-      },
-      {
-        key: 'title',
-        label: 'Primary Black Headline',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'SECRET VOLCANIQUE',
-        spatial: { position: 'absolute', left: 50, top: 530, width: 660, height: 'auto', alignment: 'left' },
-        textRules: { forcedCase: 'UPPERCASE', maxWords: 5, maxCharacters: 28, fontSize: 56, fontWeight: 'bold' },
-        purpose: 'Main curiosity hook on yellow backdrop.',
-      },
-      {
-        key: 'subtitle',
-        label: 'Secondary Red Subtitle',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'RETROUVEZ VOTRE VIGUEUR MASCULINE',
-        spatial: { position: 'absolute', left: 50, top: 600, width: 660, height: 'auto', alignment: 'left' },
-        textRules: { forcedCase: 'UPPERCASE', maxWords: 6, maxCharacters: 35, fontSize: 56, fontWeight: 'bold' },
-        purpose: 'Direct benefit promise highlighted in bold red.',
-      },
-      {
-        key: 'bodyParagraph',
-        label: 'Body Explanation Copy',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'Une formule ancestrale aux herbes rares pour une endurance naturelle et durable.',
-        spatial: { position: 'absolute', left: 50, top: 680, width: 660, height: 'auto', alignment: 'left' },
-        textRules: { forcedCase: 'NONE', minWords: 10, maxWords: 30, maxCharacters: 160, fontSize: 26, fontWeight: 'normal' },
-        purpose: 'Concise explanation addressing how and why it works.',
-      },
-      {
-        key: 'footerText',
-        label: 'Bottom Red Footer Banner',
-        type: 'text',
-        mandatory: false,
-        defaultValue: 'LIVRAISON GRATUITE + PAIEMENT À LA LIVRAISON',
-        spatial: { position: 'absolute', left: 0, top: 960, width: 1080, height: 120, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 45, fontSize: 48, fontWeight: 'bold' },
-        purpose: 'Final risk-reversal guarantee.',
-      },
+      { key: 'topBackgroundImage', label: 'Top Background', type: 'image', mandatory: false },
+      { key: 'productImage', label: 'Product Mockup', type: 'image', mandatory: true },
+      { key: 'title', label: 'Main Headline', type: 'text', mandatory: true },
+      { key: 'subtitle', label: 'Subtitle', type: 'text', mandatory: false },
+      { key: 'priceBadgeText', label: 'Price Pill', type: 'badge', mandatory: true },
     ],
   },
-
   '2-a': {
     id: '2-a',
-    name: '2-A: Publisher Content Card (Advertorial Newsfeed)',
+    name: '2-A: High Authority Publisher Editorial',
     category: 'publisher',
-    categoryLabel: 'Publisher / News Card',
-    description: 'Editorial-style ad looking like a breaking news or investigative journalism report with full-bleed photo, dark gradient, author avatar circle, and bracket-highlighted headline.',
-    bestUseCase: 'Cold traffic advertorial pre-sells, investigative angle stories, myth-busting campaigns, newsfeed pattern interrupts.',
-    recommendedNiches: ['Health Discoveries & Herbal Medicine', 'Financial Secrets & Wealth', 'Controversial Exposés', 'Founder Backstory'],
-    funnelStage: 'Unaware',
-    conversionRationale: 'Does not look like an ad; mimics high-engagement editorial newsfeed posts. Bypasses ad blindness by triggering curiosity and investigative authority.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
-      {
-        key: 'backgroundImage',
-        label: 'Full-Bleed Editorial Background Photo',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/MRESISTORFLYER4.png',
-        spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 1080 },
-        compositionRules: {
-          aspectRatio: '1:1 (1080x1080)',
-          format: 'full-bleed-photo',
-          subjectPlacement: 'CRITICAL: The main subject, face, or focal action MUST BE IN THE UPPER 60% of the image (top 0 to 650px). The bottom 40% will be obscured by a dark gradient overlay designed to ensure headline readability.',
-        },
-        purpose: 'Creates authentic editorial atmosphere and journalistic realism.',
-      },
-      {
-        key: 'headline',
-        label: 'Highlighted Editorial Headline',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'Comment cette [plante africaine] a sauvé plus de 10.000 couples',
-        spatial: { position: 'absolute', left: 80, bottom: 80, width: 920, height: 'auto', alignment: 'center' },
-        textRules: {
-          forcedCase: 'UPPERCASE',
-          minWords: 6,
-          maxWords: 14,
-          maxCharacters: 75,
-          fontSize: 48,
-          fontWeight: 'bold',
-          highlightSyntax: 'CRITICAL: Enclose the primary keyword in square brackets like [keyword] to automatically render a colored highlight box behind it.',
-        },
-        purpose: 'High-curiosity hook that demands reading the advertorial.',
-      },
-      {
-        key: 'highlightColor',
-        label: 'Highlight Box Color',
-        type: 'color',
-        mandatory: false,
-        defaultValue: '#E50914',
-        spatial: { position: 'relative' },
-        purpose: 'Accent color for bracketed keywords (e.g. #E50914 red, #00875A green, #FFE600 yellow).',
-      },
-      {
-        key: 'logoUrl',
-        label: 'Brand / News Logo',
-        type: 'image',
-        mandatory: false,
-        defaultValue: '/templates/assets/PATSIMMSCFLYER7.png',
-        spatial: { position: 'absolute', top: 50, left: 50, height: 50 },
-        compositionRules: { format: 'transparent-png' },
-        purpose: 'Media authority badge in top header.',
-      },
-      {
-        key: 'hasAvatar',
-        label: 'Enable Circular Author Inset',
-        type: 'badge',
-        mandatory: false,
-        defaultValue: true,
-        spatial: { position: 'relative' },
-        purpose: 'Toggles circular reporter/expert inset on bottom right.',
-      },
-      {
-        key: 'avatarUrl',
-        label: 'Author / Reporter Avatar Circle',
-        type: 'image',
-        mandatory: false,
-        defaultValue: '/templates/assets/images.jpeg',
-        spatial: { position: 'absolute', right: 80, bottom: 380, width: 160, height: 160, borderRadius: 80 },
-        compositionRules: {
-          aspectRatio: '1:1',
-          format: 'avatar-circle',
-          subjectPlacement: 'CRITICAL: Face MUST be centered in square/circle crop so it is not cut off by circular border.',
-        },
-        purpose: 'Author or doctor authority proof.',
-      },
+      { key: 'backgroundImage', label: 'Background Image', type: 'image', mandatory: true },
+      { key: 'logoUrl', label: 'Brand Logo', type: 'image', mandatory: false },
+      { key: 'avatarUrl', label: 'Avatar Inset', type: 'image', mandatory: false },
+      { key: 'headline', label: 'Editorial Headline', type: 'text', mandatory: true },
     ],
   },
-
   '3-a': {
     id: '3-a',
-    name: '3-A: Native Social Ad (Promo Card)',
-    category: 'social',
-    categoryLabel: 'Social Native Promo',
-    description: 'Dark-mode promo card with circular product badge, exclusive offer capsule, and glowing headline inside a translucent glass card.',
-    bestUseCase: 'Flash sales, limited-stock drops, impulse-buy products, and TikTok/Instagram dark-mode feed ads.',
-    recommendedNiches: ['Flash E-commerce Offers', 'Fitness & Slimming', 'Consumer Tech Accessories', 'Impulse Cosmetics'],
-    funnelStage: 'Most-Aware',
-    conversionRationale: 'Dark aesthetics match social media dark modes -> Circular inset instantly highlights product -> Rotated badge creates urgency -> Bottom translucent card delivers a punchy guarantee.',
+    name: '3-A: Visual Product Spotlight',
+    category: 'direct-response',
     dimensions: { width: 1080, height: 1080 },
     elements: [
-      {
-        key: 'backgroundImage',
-        label: 'Dark Atmospheric Background',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/MRESISTORFLYER5.png',
-        spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 1080 },
-        compositionRules: { aspectRatio: '1:1', format: 'full-bleed-photo' },
-        purpose: 'Creates dramatic contrast for product and text elements.',
-      },
-      {
-        key: 'productImage',
-        label: 'Top-Left Circular Product Inset',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/PATSIMMSCFLYER8.png',
-        spatial: { position: 'absolute', left: 80, top: 80, width: 240, height: 240, borderRadius: 120 },
-        compositionRules: {
-          aspectRatio: '1:1',
-          format: 'any',
-          subjectPlacement: 'CRITICAL: Product MUST BE CENTERED inside the 240x240 circle. Border is bright yellow (#FFE600).',
-        },
-        purpose: 'High-visibility focal anchor showing product.',
-      },
-      {
-        key: 'badgeText',
-        label: 'Tilted Offer Badge',
-        type: 'badge',
-        mandatory: true,
-        defaultValue: '-50% AUJOURD\'HUI',
-        spatial: { position: 'absolute', top: 50, right: 50 },
-        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 20, fontSize: 24, fontWeight: 'bold' },
-        purpose: 'Discount / promo urgency badge with 5-degree tilt.',
-      },
-      {
-        key: 'headline',
-        label: 'Bottom Glassmorphic Headline',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'FINI LES DÉCEPTIONS AU LIT ! RÉSULTAT DÈS LE PREMIER JOUR',
-        spatial: { position: 'absolute', left: 50, bottom: 80, width: 980, height: 'auto', alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 4, maxWords: 12, maxCharacters: 65, fontSize: 42, fontWeight: 'bold' },
-        purpose: 'Decisive benefit statement inside dark translucent card.',
-      },
+      { key: 'backgroundImage', label: 'Background Image', type: 'image', mandatory: true },
+      { key: 'productImage', label: 'Product Image', type: 'image', mandatory: true },
+      { key: 'headline', label: 'Headline', type: 'text', mandatory: true },
+      { key: 'badgeText', label: 'Badge', type: 'badge', mandatory: false },
     ],
   },
-
   '3-b': {
     id: '3-b',
-    name: '3-B: Native Social (Post / Tweet Proof Card)',
+    name: '3-B: Social Post / Tweet Proof',
     category: 'social',
-    categoryLabel: 'Social Proof / Tweet',
-    description: 'Social post card layout with author profile avatar, verified badge, quoted customer testimonial text, and social proof metrics (likes, retweets).',
-    bestUseCase: 'Customer testimonials, influencer endorsements, viral tweets, founder thoughts, and handling severe skepticism.',
-    recommendedNiches: ['Supplements & Wellness', 'Coaching & Consulting', 'SaaS & Digital Tools', 'High-Trust Services'],
-    funnelStage: 'Solution-Aware',
-    conversionRationale: 'Tweets and social post screenshots have among the highest CTRs because users perceive them as objective third-party testimonials rather than ads.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
-      {
-        key: 'backgroundImage',
-        label: 'Atmospheric Underlying Photo',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/The_dur_roi_lion_2.png',
-        spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 1080 },
-        compositionRules: { aspectRatio: '1:1', format: 'full-bleed-photo' },
-        purpose: 'Background behind the floating social proof card.',
-      },
-      {
-        key: 'postAuthor',
-        label: 'Author Display Name',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'Dr. Jean-Marc Koffi',
-        spatial: { position: 'relative', alignment: 'left' },
-        textRules: { forcedCase: 'NONE', maxCharacters: 30, fontSize: 28, fontWeight: 'bold' },
-        purpose: 'Name of the authority figure or customer giving the testimonial.',
-      },
-      {
-        key: 'postHandle',
-        label: 'Author @Handle',
-        type: 'text',
-        mandatory: true,
-        defaultValue: '@dr_koffi_sante',
-        spatial: { position: 'relative', alignment: 'left' },
-        textRules: { forcedCase: 'NONE', maxCharacters: 25, fontSize: 22 },
-        purpose: 'Twitter / social media handle giving platform credibility.',
-      },
-      {
-        key: 'postAvatar',
-        label: 'Author Profile Avatar',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/images_1.jpeg',
-        spatial: { position: 'relative', width: 80, height: 80, borderRadius: 40 },
-        compositionRules: {
-          aspectRatio: '1:1',
-          format: 'avatar-circle',
-          subjectPlacement: 'CRITICAL: Face must be centered in square/circle crop.',
-        },
-        purpose: 'Face photo of the testimonial provider.',
-      },
-      {
-        key: 'postContent',
-        label: 'Post / Testimonial Copy',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'Après 3 semaines de test avec le thé volcanique, les résultats de mes patients sont stupéfiants. Aucune récidive constatée.',
-        spatial: { position: 'relative', alignment: 'left' },
-        textRules: { forcedCase: 'NONE', minWords: 12, maxWords: 40, maxCharacters: 220, fontSize: 32 },
-        purpose: 'The authentic, unvarnished testimonial text.',
-      },
-      {
-        key: 'postStats',
-        label: 'Engagement Stats Line',
-        type: 'text',
-        mandatory: false,
-        defaultValue: '1.4K Reposts · 8.9K Likes',
-        spatial: { position: 'relative', alignment: 'left' },
-        textRules: { forcedCase: 'NONE', maxCharacters: 40, fontSize: 20, fontWeight: 'bold' },
-        purpose: 'Social proof numbers simulating viral engagement.',
-      },
+      { key: 'postAuthor', label: 'Author Name', type: 'text', mandatory: true },
+      { key: 'postHandle', label: 'Author Handle', type: 'text', mandatory: true },
+      { key: 'postContent', label: 'Post Body', type: 'text', mandatory: true },
     ],
   },
-
   '4-a': {
     id: '4-a',
-    name: '4-A: Recruitment & Opportunity Flyer',
+    name: '4-A: High-Impact Recruitment / Opportunity',
     category: 'recruitment',
-    categoryLabel: 'Recruitment & Hiring',
-    description: 'Opportunity poster with top white/red header bar, large centered workplace photography, urgent badge, and dual-tier compensation banners.',
-    bestUseCase: 'Recruiting tele-sales agents, hiring closing reps, distributor recruitment, affiliate onboarding.',
-    recommendedNiches: ['Call Center & Telesales Hiring', 'Distributor Programs', 'Affiliate Network Expansion', 'Corporate Vacancies'],
-    funnelStage: 'All-Stages',
-    conversionRationale: 'Clear bold job title -> Real workplace photo building trust -> Immediate transparent salary figures answering candidate questions.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
-      {
-        key: 'headerTitle',
-        label: 'Job Position Header',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'RECRUTEMENT COMMERCIAL URGENT',
-        spatial: { position: 'absolute', left: 0, top: 0, width: 1080, height: 140, alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 2, maxWords: 5, maxCharacters: 32, fontSize: 56, fontWeight: 'bold' },
-        purpose: 'Large red headline naming the job or opportunity.',
-      },
-      {
-        key: 'bodyImage',
-        label: 'Centered Workplace / Office Photo',
-        type: 'image',
-        mandatory: true,
-        defaultValue: '/templates/assets/Copie_de_AFFICHE_RECRUTEMENT_CALL_CENTER_.png',
-        spatial: { position: 'absolute', left: 80, top: 180, width: 920, height: 600, borderRadius: 16 },
-        compositionRules: {
-          aspectRatio: '23:15 (920x600)',
-          format: 'full-bleed-photo',
-          subjectPlacement: 'CRITICAL: The workplace environment, office team, or workers MUST BE CENTERED in the photo frame. Dimensions are 920px wide by 600px tall.',
-        },
-        purpose: 'Proves the legitimacy and professional atmosphere of the company.',
-      },
-      {
-        key: 'flagBadgeUrl',
-        label: 'Country Flag or Urgency Sticker',
-        type: 'image',
-        mandatory: false,
-        defaultValue: '/templates/assets/PATSIMMSCFLYER7.png',
-        spatial: { position: 'absolute', top: 30, left: 30, width: 120, height: 80 },
-        compositionRules: { format: 'any' },
-        purpose: 'Geographic targeting flag or urgent hiring sticker.',
-      },
-      {
-        key: 'footerSalary',
-        label: 'Primary Base Salary Text',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'SALAIRE : 250.000 FCFA / MOIS',
-        spatial: { position: 'absolute', left: 80, bottom: 90, width: 920, height: 'auto', alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 38, fontSize: 44, fontWeight: 'bold' },
-        purpose: 'Bold black text displaying guaranteed base compensation.',
-      },
-      {
-        key: 'footerCommissions',
-        label: 'Secondary Commissions / Bonus Text',
-        type: 'text',
-        mandatory: false,
-        defaultValue: '+ COMMISSIONS NON PLAFONNÉES',
-        spatial: { position: 'absolute', left: 80, bottom: 40, width: 920, height: 'auto', alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', maxCharacters: 38, fontSize: 38, fontWeight: 'bold' },
-        purpose: 'Red bold text highlighting uncapped performance upside.',
-      },
+      { key: 'headerTitle', label: 'Header Title', type: 'text', mandatory: true },
+      { key: 'bodyImage', label: 'Main Image', type: 'image', mandatory: true },
+      { key: 'footerSalary', label: 'Salary Breakdown', type: 'text', mandatory: true },
     ],
   },
-
   '5-a': {
     id: '5-a',
-    name: '5-A: Bold Typographic Flyer',
+    name: '5-A: Bold Typographic Statement',
     category: 'typographic',
-    categoryLabel: 'High-Impact Typographic',
-    description: 'High-contrast text flyer on vibrant green background with giant bold headline, subtitle reassurance, and pointing hand emoji.',
-    bestUseCase: 'Direct WhatsApp click-to-chat ad campaigns, urgent announcements, simple black-and-white propositions where image distractions lower conversion.',
-    recommendedNiches: ['Direct WhatsApp Orders', 'Flash Announcements', 'High-Friction Problem Solutions', 'Viral Questions'],
-    funnelStage: 'Problem-Aware',
-    conversionRationale: 'Eliminates image processing friction. On WhatsApp campaigns, users react faster to a massive direct question on a green background matching WhatsApp branding.',
     dimensions: { width: 1080, height: 1080 },
     elements: [
-      {
-        key: 'backgroundColor',
-        label: 'Canvas Background Color',
-        type: 'color',
-        mandatory: false,
-        defaultValue: '#55B23B',
-        spatial: { position: 'relative' },
-        purpose: 'Background color hex. Defaults to #55B23B (WhatsApp green).',
-      },
-      {
-        key: 'title',
-        label: 'Giant Centered Headline',
-        type: 'text',
-        mandatory: true,
-        defaultValue: 'VOULEZ-VOUS DURER PLUS DE 45 MINUTES NATURELLEMENT ?',
-        spatial: { position: 'relative', alignment: 'center' },
-        textRules: { forcedCase: 'UPPERCASE', minWords: 3, maxWords: 10, maxCharacters: 55, fontSize: 72, fontWeight: 'bold' },
-        purpose: 'The singular, unavoidable question or value proposition.',
-      },
-      {
-        key: 'subtitle',
-        label: 'Subtitle / Action Reassurance',
-        type: 'text',
-        mandatory: false,
-        defaultValue: 'CLIQUEZ CI-DESSOUS POUR COMMANDER SUR WHATSAPP',
-        spatial: { position: 'relative', alignment: 'center' },
-        textRules: { forcedCase: 'NONE', minWords: 3, maxWords: 12, maxCharacters: 65, fontSize: 44, fontWeight: '500' },
-        purpose: 'Clear directional instruction driving the click.',
-      },
-      {
-        key: 'emoji',
-        label: 'Corner Pointer Emoji',
-        type: 'text',
-        mandatory: false,
-        defaultValue: '👇',
-        spatial: { position: 'absolute', bottom: 80 },
-        purpose: 'Dual bottom corner emojis (default 👇) directing attention to the ad CTA button.',
-      },
-    ],
-  },
-
-  'custom': {
-    id: 'custom',
-    name: 'Custom Visual Canvas (Freeform Layers)',
-    category: 'custom',
-    categoryLabel: 'Studio Canvas',
-    description: 'Freeform visual canvas with multi-layer stacking for custom text, shape, and image compositions constructed by external graphic tools or canvas builders.',
-    bestUseCase: 'Bespoke multi-layer designs generated by external AI agents or graphic layout algorithms.',
-    recommendedNiches: ['Custom Branded Ads', 'Multi-Layer Graphic Compositions'],
-    funnelStage: 'All-Stages',
-    conversionRationale: 'Provides full flexibility for arbitrary layout configurations.',
-    dimensions: { width: 1080, height: 1080 },
-    elements: [
-      {
-        key: 'canvasBgColor',
-        label: 'Canvas Background Color',
-        type: 'color',
-        mandatory: false,
-        defaultValue: '#0f172a',
-        spatial: { position: 'relative' },
-        purpose: 'Base background color for the canvas.',
-      },
-      {
-        key: 'layers',
-        label: 'Layer Stack Hierarchy',
-        type: 'layers',
-        mandatory: false,
-        defaultValue: [],
-        spatial: { position: 'relative' },
-        purpose: 'Array of layer objects { id, type: "text"|"image"|"shape", left, top, width, height, zIndex, ... }',
-      },
+      { key: 'title', label: 'Main Title', type: 'text', mandatory: true },
+      { key: 'subtitle', label: 'Subtitle', type: 'text', mandatory: false },
     ],
   },
 };
 
 /**
- * Execute HTTP assemble request with automatic local/remote failover
+ * Dynamically resolves a template contract:
+ * Checks local data/templates/ -> checks HTTP endpoint /api/templates/:id -> falls back to built-in.
  */
-async function executeAssembleRequest(payload, customEndpoint) {
-  const endpointsToTry = [];
-  if (customEndpoint) {
-    endpointsToTry.push(customEndpoint);
-  }
-  endpointsToTry.push(LOCAL_ENDPOINT);
-  endpointsToTry.push(REMOTE_ENDPOINT);
+async function resolveContract(templateId, customEndpoint) {
+  const cleanId = String(templateId || '').trim();
 
-  const uniqueEndpoints = [...new Set(endpointsToTry)];
-  let lastError = null;
-
-  for (const endpoint of uniqueEndpoints) {
-    try {
-      const url = `${endpoint.replace(/\/$/, '')}/api/assemble`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(15000),
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        return { success: true, endpoint, data: json };
-      } else {
-        const errText = await res.text();
-        lastError = new Error(`HTTP ${res.status} from ${endpoint}: ${errText}`);
-      }
-    } catch (err) {
-      lastError = err;
+  // 1. Check local ephemeral template storage on disk
+  try {
+    const localFile = path.join(LOCAL_TEMPLATES_DIR, `${cleanId}.json`);
+    if (fs.existsSync(localFile)) {
+      const data = JSON.parse(fs.readFileSync(localFile, 'utf-8'));
+      if (data.contract) return data.contract;
     }
-  }
+  } catch {}
 
-  throw lastError || new Error('All assemble endpoints failed');
+  // 2. Fetch from active API endpoint
+  try {
+    const endpoint = await getLiveEndpoint(customEndpoint);
+    const res = await fetch(`${endpoint.replace(/\/$/, '')}/api/templates/${cleanId}`, {
+      headers: { 'X-SuperAds-Source': 'mcp' },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.contract) return data.contract;
+      if (data.template?.contract) return data.template.contract;
+    }
+  } catch {}
+
+  // 3. Built-in presets fallback
+  return BUILTIN_FALLBACK_CONTRACTS[cleanId] || null;
 }
 
 /**
- * Helper to validate a template payload against its contract
+ * Execute HTTP assemble request with automatic local/remote failover
  */
-function validatePayload(templateId, variables = {}) {
-  const contract = TEMPLATE_CONTRACTS[templateId];
-  if (!contract) {
-    return {
-      isValid: false,
-      templateId,
-      missingMandatory: [`Invalid templateId "${templateId}". Valid IDs: ${Object.keys(TEMPLATE_CONTRACTS).join(', ')}`],
-      warnings: [],
-      compositionAdvice: [],
-      resolvedVariables: variables,
-    };
+async function executeAssembleRequest(payload, customEndpoint) {
+  const endpoint = await getLiveEndpoint(customEndpoint);
+  const url = `${endpoint.replace(/\/$/, '')}/api/assemble`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-SuperAds-Source': 'mcp',
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(25000),
+  });
+
+  if (res.ok) {
+    const json = await res.json();
+    return { success: true, endpoint, data: json };
+  } else {
+    const errText = await res.text();
+    throw new Error(`HTTP ${res.status} from ${endpoint}: ${errText}`);
   }
-
-  const missingMandatory = [];
-  const warnings = [];
-  const compositionAdvice = [];
-  const resolvedVariables = { ...variables };
-
-  for (const elem of contract.elements) {
-    const val = variables[elem.key];
-    const isProvided = val !== undefined && val !== null && val !== '';
-
-    if (elem.mandatory && !isProvided) {
-      missingMandatory.push(`Missing mandatory element: "${elem.key}" (${elem.label})`);
-      resolvedVariables[elem.key] = elem.defaultValue;
-    }
-
-    if (elem.type === 'text' && isProvided && typeof val === 'string') {
-      if (elem.textRules?.maxCharacters && val.length > elem.textRules.maxCharacters) {
-        warnings.push(`Text for "${elem.key}" is ${val.length} chars (exceeds recommended max ${elem.textRules.maxCharacters} chars).`);
-      }
-      if (elem.textRules?.forcedCase === 'UPPERCASE' && val.toUpperCase() !== val) {
-        warnings.push(`Element "${elem.key}" works best in UPPERCASE for visual punch. Recommended: "${val.toUpperCase()}"`);
-      }
-    }
-
-    if (elem.type === 'image') {
-      if (elem.compositionRules?.subjectPlacement) {
-        compositionAdvice.push(`[${elem.key}]: ${elem.compositionRules.subjectPlacement}`);
-      }
-      if (elem.compositionRules?.format === 'transparent-png' && typeof val === 'string' && !val.includes('.png') && !val.includes('image/png')) {
-        warnings.push(`[${elem.key}] is marked as "transparent-png". Ensure asset has transparent background to avoid rectangular artifacts.`);
-      }
-    }
-  }
-
-  return {
-    isValid: missingMandatory.length === 0,
-    templateId,
-    missingMandatory,
-    warnings,
-    compositionAdvice,
-    resolvedVariables,
-  };
 }
 
 /**
@@ -704,7 +210,7 @@ function validatePayload(templateId, variables = {}) {
 const server = new Server(
   {
     name: 'superads-creative-engine',
-    version: '2.0.0',
+    version: '2.5.0',
   },
   {
     capabilities: {
@@ -721,42 +227,83 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'list_templates',
-        description: 'Returns all available SuperAds templates with descriptions, best use cases, recommended e-commerce niches, funnel awareness stages, and mandatory element counts.',
+        description: 'Returns all available SuperAds templates (both built-in presets and dynamically extracted custom templates) with descriptions, best use cases, and element contracts.',
         inputSchema: {
           type: 'object',
           properties: {
             category: {
               type: 'string',
-              enum: ['all', 'direct-response', 'publisher', 'social', 'recruitment', 'typographic', 'custom'],
-              description: 'Optional category filter.',
+              description: 'Optional category filter (e.g. direct-response, publisher, social, recruitment, custom, all).',
             },
           },
         },
       },
       {
         name: 'get_template_details',
-        description: 'Returns the COMPLETE contract for a template: all required text/image elements, mandatory vs optional flags, spatial coordinates, image composition rules (e.g. centering, transparent cutouts), character bounds, and default values.',
+        description: 'Returns the complete contract for any template ID: element roles, mandatory flags, spatial coordinates, 3-sigma character capacity limits, and image composition rules.',
         inputSchema: {
           type: 'object',
           properties: {
             templateId: {
               type: 'string',
-              enum: ['1-a', '1-b', '2-a', '3-a', '3-b', '4-a', '5-a', 'custom'],
-              description: 'Template identifier to inspect.',
+              description: 'Template identifier to inspect (e.g. "1-a", "custom_172...").',
             },
           },
           required: ['templateId'],
         },
       },
       {
+        name: 'extract_template_contract',
+        description: 'Dynamically extracts a formal ad contract from an uploaded image or raw layout AST on the fly without hardcoding, applying 3-Sigma Glyph Capacity theorems for text limits.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sourceAst: {
+              type: 'object',
+              description: 'Optional raw layout AST or layers array to extract contract from.',
+            },
+            imageUrl: {
+              type: 'string',
+              description: 'Optional image URL or base64 data URL to analyze and extract contract from.',
+            },
+            templateId: {
+              type: 'string',
+              description: 'Optional template ID to extract contract from.',
+            },
+          },
+        },
+      },
+      {
+        name: 'create_template_from_image',
+        description: 'Reverse-engineers an ad image into discrete visual layers, computes 3-sigma contracts, stores it in R2/cache, and returns the new template ready for headless rendering.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            image: {
+              type: 'string',
+              description: 'Base64 data URL or raw base64 string of the target flyer/ad to deconstruct.',
+            },
+            name: {
+              type: 'string',
+              description: 'Optional descriptive name for the new dynamic template.',
+            },
+            category: {
+              type: 'string',
+              description: 'Optional category classification.',
+            },
+          },
+          required: ['image'],
+        },
+      },
+      {
         name: 'validate_template_payload',
-        description: 'Validates an ad creative payload against the template contract before rendering. Flags missing mandatory elements, text overflow warnings, and image centering/transparency composition rules.',
+        description: 'Validates an ad creative payload against its dynamic template contract before rendering, flagging missing mandatory fields and character overflow warnings.',
         inputSchema: {
           type: 'object',
           properties: {
             templateId: {
               type: 'string',
-              description: 'Target template ID (e.g. "1-a", "2-a").',
+              description: 'Target template ID.',
             },
             variables: {
               type: 'object',
@@ -768,17 +315,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'render_ad',
-        description: 'Compiles and renders a high-converting static image ad to Base64 PNG preview, local file path, or Cloudflare R2 CDN URL.',
+        description: 'Compiles and renders a static image ad to Base64 PNG preview, local file path, or Cloudflare R2 CDN URL.',
         inputSchema: {
           type: 'object',
           properties: {
             templateId: {
               type: 'string',
-              description: 'The template ID to render.',
+              description: 'The template ID to render (preset or dynamic).',
             },
             variables: {
               type: 'object',
-              description: 'Key-value object containing template text/image variables matching the template contract.',
+              description: 'Key-value object containing template text/image variables matching the contract.',
             },
             uploadToR2: {
               type: 'boolean',
@@ -829,21 +376,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['manifest'],
         },
       },
-      {
-        name: 'validate_ad_copy',
-        description: 'Direct-response copy auditor scoring headline length, price formatting (FCFA), urgency triggers, and trust points against direct-response best practices.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            templateId: { type: 'string' },
-            headline: { type: 'string' },
-            subtitle: { type: 'string' },
-            priceBadge: { type: 'string' },
-            body: { type: 'string' },
-            cta: { type: 'string' },
-          },
-        },
-      },
     ],
   };
 });
@@ -857,109 +389,154 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'list_templates': {
-        const categoryFilter = args?.category;
-        let list = Object.values(TEMPLATE_CONTRACTS);
-        if (categoryFilter && categoryFilter !== 'all') {
-          list = list.filter(t => t.category === categoryFilter);
-        }
+        const endpoint = await getLiveEndpoint();
+        try {
+          const res = await fetch(`${endpoint.replace(/\/$/, '')}/api/templates`, {
+            headers: { 'X-SuperAds-Source': 'mcp' },
+            signal: AbortSignal.timeout(2500),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            let templates = data.templates || [];
+            if (args?.category && args.category !== 'all') {
+              templates = templates.filter(t => t.category === args.category);
+            }
+            return {
+              content: [{ type: 'text', text: JSON.stringify({ count: templates.length, templates }, null, 2) }],
+            };
+          }
+        } catch {}
 
+        // Fallback
+        const fallbackList = Object.values(BUILTIN_FALLBACK_CONTRACTS);
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  count: list.length,
-                  templates: list.map(t => ({
-                    id: t.id,
-                    name: t.name,
-                    category: t.category,
-                    description: t.description,
-                    bestUseCase: t.bestUseCase,
-                    recommendedNiches: t.recommendedNiches,
-                    funnelStage: t.funnelStage,
-                    dimensions: t.dimensions,
-                    mandatoryElements: t.elements.filter(e => e.mandatory).map(e => e.key),
-                    optionalElements: t.elements.filter(e => !e.mandatory).map(e => e.key),
-                  })),
-                },
-                null,
-                2
-              ),
-            },
-          ],
+          content: [{ type: 'text', text: JSON.stringify({ count: fallbackList.length, templates: fallbackList }, null, 2) }],
         };
       }
 
       case 'get_template_details': {
         const templateId = args?.templateId;
-        const contract = TEMPLATE_CONTRACTS[templateId];
+        const contract = await resolveContract(templateId);
         if (!contract) {
-          throw new Error(`Template "${templateId}" not found. Valid IDs: ${Object.keys(TEMPLATE_CONTRACTS).join(', ')}`);
+          throw new Error(`Template contract for "${templateId}" could not be resolved.`);
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify(contract, null, 2) }],
+        };
+      }
+
+      case 'extract_template_contract': {
+        const endpoint = await getLiveEndpoint();
+        const res = await fetch(`${endpoint.replace(/\/$/, '')}/api/templates/extract`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-SuperAds-Source': 'mcp',
+          },
+          body: JSON.stringify(args || {}),
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`Extraction failed: ${err}`);
         }
 
+        const data = await res.json();
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(contract, null, 2),
-            },
-          ],
+          content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+        };
+      }
+
+      case 'create_template_from_image': {
+        const endpoint = await getLiveEndpoint();
+        const res = await fetch(`${endpoint.replace(/\/$/, '')}/api/templates/deconstruct`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-SuperAds-Source': 'mcp',
+          },
+          body: JSON.stringify(args || {}),
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`Deconstruction failed: ${err}`);
+        }
+
+        const data = await res.json();
+        return {
+          content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
         };
       }
 
       case 'validate_template_payload': {
-        const templateId = args?.templateId;
-        const variables = args?.variables || {};
-        const diag = validatePayload(templateId, variables);
+        const { templateId, variables } = args;
+        const contract = await resolveContract(templateId);
+        if (!contract) {
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                isValid: false,
+                templateId,
+                missingMandatory: [`Unknown templateId "${templateId}".`],
+                warnings: [],
+              }, null, 2),
+            }],
+          };
+        }
+
+        const missingMandatory = [];
+        const warnings = [];
+        for (const elem of (contract.elements || [])) {
+          const val = variables?.[elem.key];
+          const isProvided = val !== undefined && val !== null && val !== '';
+          if (elem.mandatory && !isProvided) {
+            missingMandatory.push(`Missing mandatory element: "${elem.key}" (${elem.label || elem.name || elem.role})`);
+          }
+          if (elem.type === 'text' && isProvided && typeof val === 'string') {
+            if (elem.textRules?.maxCharacters && val.length > elem.textRules.maxCharacters) {
+              warnings.push(`Text for "${elem.key}" is ${val.length} chars (exceeds recommended max ${elem.textRules.maxCharacters} chars).`);
+            }
+          }
+        }
 
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(diag, null, 2),
-            },
-          ],
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              isValid: missingMandatory.length === 0,
+              templateId,
+              missingMandatory,
+              warnings,
+            }, null, 2),
+          }],
         };
       }
 
       case 'render_ad': {
-        const templateId = args?.templateId;
-        const variables = args?.variables || {};
-        const uploadToR2 = Boolean(args?.uploadToR2);
-        const outputPath = args?.outputPath;
-        const customEndpoint = args?.endpoint;
+        const { templateId, variables, uploadToR2, outputPath, endpoint: customEndpoint } = args;
+        const payload = {
+          templateId,
+          variables: variables || {},
+          uploadToR2: Boolean(uploadToR2),
+        };
 
-        // Run validation check first
-        const diag = validatePayload(templateId, variables);
+        const result = await executeAssembleRequest(payload, customEndpoint);
+        const data = result.data;
 
-        const assembleResult = await executeAssembleRequest(
-          {
-            templateId,
-            variables: diag.resolvedVariables,
-            uploadToR2,
-          },
-          customEndpoint
-        );
-
-        const resData = assembleResult.data;
         let localSavedPath = null;
-
-        if (outputPath && resData.dataUrl) {
-          const base64Clean = resData.dataUrl.replace(/^data:image\/png;base64,/, '');
-          const buffer = Buffer.from(base64Clean, 'base64');
-          const resolvedPath = path.resolve(outputPath);
-          const parentDir = path.dirname(resolvedPath);
-          if (!fs.existsSync(parentDir)) {
-            fs.mkdirSync(parentDir, { recursive: true });
+        if (outputPath && data.imageBase64) {
+          const targetDir = path.dirname(outputPath);
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
           }
-          fs.writeFileSync(resolvedPath, buffer);
-          localSavedPath = resolvedPath;
+          const base64Data = data.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+          fs.writeFileSync(outputPath, Buffer.from(base64Data, 'base64'));
+          localSavedPath = path.resolve(outputPath);
         }
-
-        const approxSizeKb = resData.dataUrl
-          ? (Math.round((resData.dataUrl.length * 0.75) / 1024 * 10) / 10)
-          : null;
 
         return {
           content: [
@@ -967,22 +544,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: 'text',
               text: JSON.stringify(
                 {
-                  success: true,
+                  status: 'success',
                   templateId,
-                  dimensions: {
-                    width: resData.width || 1080,
-                    height: resData.height || 1080,
-                  },
-                  r2Url: resData.r2Url || null,
-                  localSavedPath,
-                  approxSizeKb,
-                  endpointUsed: assembleResult.endpoint,
-                  diagnostics: {
-                    isValid: diag.isValid,
-                    missingMandatory: diag.missingMandatory,
-                    warnings: diag.warnings,
-                  },
-                  dataUrlPreview: resData.dataUrl ? resData.dataUrl.substring(0, 100) + '...' : null,
+                  endpoint: result.endpoint,
+                  r2Url: data.r2Url || null,
+                  localPath: localSavedPath,
+                  dimensions: data.dimensions,
+                  hasBase64Preview: Boolean(data.imageBase64),
                 },
                 null,
                 2
@@ -993,180 +561,75 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'batch_render_campaign': {
-        const manifest = args?.manifest;
-        if (!Array.isArray(manifest) || manifest.length === 0) {
-          throw new Error('Manifest must be a non-empty array of ad configurations.');
-        }
-
-        const outputDir = path.resolve(args?.outputDir || './output');
+        const { manifest, outputDir = './output', endpoint: customEndpoint } = args;
         if (!fs.existsSync(outputDir)) {
           fs.mkdirSync(outputDir, { recursive: true });
         }
 
-        const customEndpoint = args?.endpoint;
         const results = [];
-
         for (let i = 0; i < manifest.length; i++) {
           const item = manifest[i];
-          const templateId = item.templateId || '1-a';
-          const outputName = item.outputName || `campaign-ad-${i + 1}-${templateId}.png`;
-          const uploadToR2 = Boolean(item.uploadToR2);
-          const destPath = path.join(outputDir, outputName);
+          const outName = item.outputName || `ad-${item.templateId}-var${i + 1}.png`;
+          const targetPath = path.join(outputDir, outName);
 
           try {
-            const diag = validatePayload(templateId, item.variables || {});
-            const assembleResult = await executeAssembleRequest(
+            const res = await executeAssembleRequest(
               {
-                templateId,
-                variables: diag.resolvedVariables,
-                uploadToR2,
+                templateId: item.templateId,
+                variables: item.variables || {},
+                uploadToR2: Boolean(item.uploadToR2),
               },
               customEndpoint
             );
 
-            const resData = assembleResult.data;
-            if (resData.dataUrl) {
-              const base64Clean = resData.dataUrl.replace(/^data:image\/png;base64,/, '');
-              fs.writeFileSync(destPath, Buffer.from(base64Clean, 'base64'));
+            if (res.data?.imageBase64) {
+              const cleanBase64 = res.data.imageBase64.replace(/^data:image\/\w+;base64,/, '');
+              fs.writeFileSync(targetPath, Buffer.from(cleanBase64, 'base64'));
             }
 
             results.push({
               index: i + 1,
-              templateId,
-              outputName,
-              success: true,
-              savedTo: destPath,
-              r2Url: resData.r2Url || null,
-              warnings: diag.warnings,
+              templateId: item.templateId,
+              status: 'rendered',
+              localPath: targetPath,
+              r2Url: res.data?.r2Url || null,
             });
           } catch (err) {
             results.push({
               index: i + 1,
-              templateId,
-              outputName,
-              success: false,
+              templateId: item.templateId,
+              status: 'failed',
               error: err.message,
             });
           }
         }
 
-        const successCount = results.filter(r => r.success).length;
-
         return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  totalRequested: manifest.length,
-                  successful: successCount,
-                  failed: manifest.length - successCount,
-                  outputDirectory: outputDir,
-                  creatives: results,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case 'validate_ad_copy': {
-        const { headline = '', subtitle = '', priceBadge = '', body = '', cta = '' } = args || {};
-
-        const suggestions = [];
-        const warnings = [];
-        let score = 100;
-
-        if (headline.length > 0) {
-          const words = headline.trim().split(/\s+/).length;
-          if (words > 12) {
-            warnings.push(`Headline is ${words} words long. Recommended maximum for mobile readability is 8-10 words.`);
-            score -= 15;
-          }
-          if (headline.toUpperCase() === headline && headline.length > 50) {
-            suggestions.push('Long all-caps headlines can be hard to parse on small screens; consider sentence case with highlighted keywords.');
-          }
-        } else {
-          warnings.push('Missing primary headline.');
-          score -= 30;
-        }
-
-        if (priceBadge.length > 0) {
-          const hasCurrency = /(FCFA|F\b|CFA|XOF|\$|€|GNF)/i.test(priceBadge);
-          if (!hasCurrency) {
-            suggestions.push('Price badge is missing explicit currency (e.g. FCFA or CFA) which reduces clarity.');
-            score -= 10;
-          }
-        }
-
-        const fullText = `${headline} ${subtitle} ${body} ${cta}`.toLowerCase();
-        const hasReassurance = /(livraison|paiement|discret|garanti|naturel|gratuit|remboursement)/i.test(fullText);
-        if (!hasReassurance) {
-          suggestions.push('Add trust terms such as "Paiement à la livraison", "Livraison discrète", or "100% Naturel".');
-          score -= 15;
-        }
-
-        const hasUrgency = /(aujourd'hui|limité|stock|derniers|vite|promo|urgent)/i.test(fullText);
-        if (!hasUrgency) {
-          suggestions.push('Add urgency elements (e.g. "Offre valable aujourd\'hui", "Stock limité").');
-          score -= 10;
-        }
-
-        score = Math.max(0, Math.min(100, score));
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  copyScore: score,
-                  qualityGrade: score >= 85 ? 'A (Excellent DR Ad)' : score >= 70 ? 'B (Good Copy)' : score >= 50 ? 'C (Needs Optimization)' : 'D (Weak Direct Response)',
-                  warnings,
-                  suggestions,
-                  summary: {
-                    headlineLength: headline.length,
-                    hasPrice: priceBadge.length > 0,
-                    hasReassuranceTrigger: hasReassurance,
-                    hasUrgencyTrigger: hasUrgency,
-                  },
-                },
-                null,
-                2
-              ),
-            },
-          ],
+          content: [{ type: 'text', text: JSON.stringify({ count: results.length, batch: results }, null, 2) }],
         };
       }
 
       default:
-        throw new Error(`Unknown tool name: ${name}`);
+        throw new Error(`Unknown MCP tool: ${name}`);
     }
   } catch (error) {
     return {
       isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `Error executing tool "${name}": ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
+      content: [{ type: 'text', text: `Tool "${name}" failed: ${error.message}` }],
     };
   }
 });
 
 /**
- * Start the MCP Server using Standard I/O Transport
+ * Start Stdio JSON-RPC MCP Server
  */
-async function runServer() {
+async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[MCP Server] SuperAds Creative Engine MCP server v2.0 running on stdio.');
+  console.error('SuperAds Creative Engine MCP Server running over stdio JSON-RPC.');
 }
 
-runServer().catch(err => {
-  console.error('[MCP Server] Fatal initialization error:', err);
+main().catch((err) => {
+  console.error('Fatal MCP server error:', err);
   process.exit(1);
 });

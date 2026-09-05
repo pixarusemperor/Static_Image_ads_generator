@@ -3,10 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   getTemplateComponent, 
-  TemplateId 
+  TemplateId,
+  CustomTemplate
 } from '@/components/templates';
 import { defaultTemplatesData } from '@/components/templates/template-defaults';
 import { TemplateSelector } from '@/components/TemplateSelector';
+import { SettingsModal, GEMINI_KEY_STORAGE_KEY } from '@/components/SettingsModal';
 import { 
   Upload, 
   Download, 
@@ -157,6 +159,7 @@ export default function HTMLCSSEditorDashboard() {
 
   // --- Programmatic Assembler States ---
   const [isAssembling, setIsAssembling] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // --- HTML Elements & Drag states ---
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -260,9 +263,15 @@ export default function HTMLCSSEditorDashboard() {
     setAnalysisWarning(null);
 
     try {
+      const storedKey = typeof window !== 'undefined' ? localStorage.getItem(GEMINI_KEY_STORAGE_KEY) : '';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (storedKey) {
+        headers['x-gemini-api-key'] = storedKey;
+      }
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           image: referencePreview,
           name: referenceFile?.name || 'ad.png',
@@ -304,13 +313,77 @@ export default function HTMLCSSEditorDashboard() {
     }
   };
 
+  const handleDeconstructReference = async () => {
+    if (!referencePreview) return;
+    setIsAnalyzing(true);
+    setAnalysisWarning(null);
+
+    try {
+      const storedKey = typeof window !== 'undefined' ? localStorage.getItem(GEMINI_KEY_STORAGE_KEY) : '';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (storedKey) {
+        headers['x-gemini-api-key'] = storedKey;
+      }
+
+      const response = await fetch('/api/templates/deconstruct', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          image: referencePreview,
+          name: referenceFile?.name || 'custom-ad.png',
+        }),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (data.template) {
+        setTemplateId('custom');
+        setVariables({
+          layers: data.template.layers || [],
+          canvasBgColor: data.template.canvas_json?.background || '#0f172a',
+        });
+        setSelectedLayerKey(null);
+        setChatMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: `Successfully deconstructed "${data.template.name}" into ${data.template.layers?.length || 0} discrete visual layers with zero-hardcoded contracts! Estimated cost: $${(data.tokenUsage?.estimatedCostUsd || 0).toFixed(4)}.`
+          }
+        ]);
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      setAnalysisWarning(err instanceof Error ? err.message : 'Dynamic template deconstruction failed.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // --- Dynamic Form Controls ---
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleVariableChange = (key: string, value: any) => {
-    setVariables(prev => ({
-      ...prev,
-      [key]: value,
-    }));
+    setVariables(prev => {
+      if (templateId === 'custom' && Array.isArray(prev.layers) && key !== 'canvasBgColor') {
+        return {
+          ...prev,
+          layers: prev.layers.map((l: any) => {
+            if (l.id === key) {
+              if (l.type === 'text') return { ...l, text: value };
+              if (l.type === 'image') return { ...l, imageUrl: value };
+              if (l.type === 'shape') return { ...l, backgroundColor: value };
+            }
+            return l;
+          }),
+        };
+      }
+      return {
+        ...prev,
+        [key]: value,
+      };
+    });
   };
 
   const handleImageFileChange = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -434,9 +507,15 @@ export default function HTMLCSSEditorDashboard() {
     setIsChatSending(true);
 
     try {
+      const storedKey = typeof window !== 'undefined' ? localStorage.getItem(GEMINI_KEY_STORAGE_KEY) : '';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (storedKey) {
+        headers['x-gemini-api-key'] = storedKey;
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           prompt: userMsg,
           templateId,
@@ -514,9 +593,29 @@ export default function HTMLCSSEditorDashboard() {
     }
   };
 
-  const ActiveTemplateComponent = getTemplateComponent(templateId);
-  const currentLayers = templateLayers[templateId] || [];
-  const currentDraggables = draggableConfigs[templateId] || [];
+  const ActiveTemplateComponent = getTemplateComponent(templateId) || (templateId === 'custom' ? CustomTemplate : null);
+  
+  const currentLayers = templateId === 'custom' && Array.isArray(variables.layers)
+    ? [
+        { key: 'canvasBgColor', name: 'Canvas Background', type: 'color' as const },
+        ...variables.layers.map((l: any) => ({
+          key: l.id,
+          name: l.name || l.role || l.text || l.id,
+          type: (l.type === 'text' ? 'text' : l.type === 'image' ? 'image' : 'color') as 'text' | 'image' | 'color',
+        }))
+      ]
+    : (templateLayers[templateId] || []);
+
+  const currentDraggables = templateId === 'custom' && Array.isArray(variables.layers)
+    ? variables.layers.map((l: any) => ({
+        key: l.id,
+        name: l.name || l.role || l.id,
+        left: l.left,
+        top: l.top,
+        width: l.width,
+        height: l.height,
+      }))
+    : (draggableConfigs[templateId] || []);
 
   return (
     <div className="flex flex-col flex-1 h-screen bg-zinc-950 text-zinc-100 font-sans overflow-hidden">
@@ -533,6 +632,15 @@ export default function HTMLCSSEditorDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
+            title="AI & Model Settings"
+          >
+            <Settings className="w-4 h-4 text-indigo-400" />
+            <span>Settings & Telemetry</span>
+          </button>
+
           <button
             onClick={handleDownloadPNG}
             disabled={isAssembling}
@@ -597,23 +705,33 @@ export default function HTMLCSSEditorDashboard() {
             </label>
 
             {referencePreview && (
-              <button
-                onClick={handleAnalyzeReference}
-                disabled={isAnalyzing}
-                className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 text-zinc-200 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                    Analyzing Layout...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
-                    Analyze with Gemini AI
-                  </>
-                )}
-              </button>
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={handleAnalyzeReference}
+                  disabled={isAnalyzing}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 text-zinc-200 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      Analyzing Layout...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
+                      Classify Preset (Gemini AI)
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleDeconstructReference}
+                  disabled={isAnalyzing}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Deconstruct to Custom Template
+                </button>
+              </div>
             )}
 
             {analysisWarning && (
@@ -771,7 +889,15 @@ export default function HTMLCSSEditorDashboard() {
 
           <div className="flex flex-col gap-3.5">
             {currentLayers.map((layer) => {
-              const value = variables[layer.key] ?? '';
+              let value = variables[layer.key] ?? '';
+              if (templateId === 'custom' && Array.isArray(variables.layers)) {
+                const targetLayer = variables.layers.find((l: any) => l.id === layer.key);
+                if (targetLayer) {
+                  if (layer.type === 'text') value = targetLayer.text ?? '';
+                  if (layer.type === 'image') value = targetLayer.imageUrl ?? '';
+                  if (layer.type === 'color') value = targetLayer.color || targetLayer.backgroundColor || variables[layer.key] || '';
+                }
+              }
               const isSelected = selectedLayerKey === layer.key;
 
               return (
@@ -952,8 +1078,13 @@ export default function HTMLCSSEditorDashboard() {
             </div>
           </form>
         </aside>
-
       </div>
+
+      {/* --- In-App AI Settings & Telemetry Modal --- */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }

@@ -31,13 +31,16 @@ export async function POST(request: NextRequest) {
     // If client requested R2 upload or JSON response
     const acceptHeader = request.headers.get('accept') || '';
     if (uploadToR2 || acceptHeader.includes('application/json')) {
+      const base64Url = `data:image/png;base64,${result.pngBuffer.toString('base64')}`;
       return NextResponse.json({
         success: true,
         templateId,
         width: result.width,
         height: result.height,
+        dimensions: { width: result.width, height: result.height },
         r2Url: result.r2Url || null,
-        dataUrl: `data:image/png;base64,${result.pngBuffer.toString('base64')}`,
+        dataUrl: base64Url,
+        imageBase64: base64Url,
       });
     }
 

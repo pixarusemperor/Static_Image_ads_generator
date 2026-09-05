@@ -1,8 +1,9 @@
 import React from 'react';
 import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
-import { getTemplateComponent, templatesDimensions, TemplateId } from '@/components/templates';
+import { getTemplateComponent, templatesDimensions, TemplateId, CustomTemplate } from '@/components/templates';
 import { defaultTemplatesData } from '@/components/templates/template-defaults';
+import { getDynamicTemplate, StoredTemplate } from '@/core/templates/storage';
 import { resolveImageToBase64, SAFE_PNG_PLACEHOLDER } from '@/utils/image';
 import { getFontBuffers } from '@/utils/fonts';
 import { isR2Configured } from '@/lib/env';
@@ -26,17 +27,9 @@ export interface RenderAdResult {
   r2Url?: string;
 }
 
-function generateSafePlaceholderSvg(text: string = 'Image'): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
-    <rect width="400" height="400" fill="#1e293b"/>
-    <circle cx="200" cy="180" r="40" fill="#475569"/>
-    <text x="200" y="260" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="18" font-weight="600" text-anchor="middle">${text}</text>
-  </svg>`;
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-}
-
 /**
  * Universal headless ad rendering engine.
+ * Supports static presets and dynamic templates retrieved from Cloudflare R2 / local storage.
  * Decoupled from Next.js HTTP requests with bulletproof fallback resilience.
  */
 export async function renderAdToPng(
@@ -44,22 +37,66 @@ export async function renderAdToPng(
   incomingVariables: Record<string, any> = {},
   options: RenderAdOptions = {}
 ): Promise<RenderAdResult> {
-  const Template = getTemplateComponent(templateId);
+  let Template = getTemplateComponent(templateId);
+  let dynamicTemplate: StoredTemplate | null = null;
+
   if (!Template) {
-    throw new Error(`Invalid templateId: "${templateId}".`);
+    dynamicTemplate = await getDynamicTemplate(templateId);
+    if (dynamicTemplate) {
+      Template = CustomTemplate;
+    } else {
+      throw new Error(`Invalid templateId: "${templateId}". Template not found in presets or dynamic storage.`);
+    }
   }
 
   // Determine canvas dimensions
-  const width = options.width || incomingVariables?.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
-  const height = options.height || incomingVariables?.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
+  const width = options.width || incomingVariables?.width || dynamicTemplate?.dimensions?.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
+  const height = options.height || incomingVariables?.height || dynamicTemplate?.dimensions?.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
 
   // Merge default variables with user overrides
-  const defaults = defaultTemplatesData[templateId as TemplateId] || {};
+  let defaults: Record<string, any> = {};
+  if (dynamicTemplate) {
+    defaults = {
+      ...(dynamicTemplate.defaultVariables || {}),
+      canvasBgColor: dynamicTemplate.canvas_json?.background || '#0f172a',
+      layers: dynamicTemplate.layers || [],
+    };
+  } else {
+    defaults = defaultTemplatesData[templateId as TemplateId] || {};
+  }
+
   const safeIncoming = (incomingVariables && typeof incomingVariables === 'object') ? incomingVariables : {};
   const resolvedVariables: Record<string, any> = { ...defaults, ...safeIncoming };
 
-  // Resolve images inside CustomTemplate layers if applicable
+  // Map incoming key-value overrides to layers if layers array exists
   if (resolvedVariables.layers && Array.isArray(resolvedVariables.layers)) {
+    const overrideKeys = Object.keys(safeIncoming).filter(
+      k => k !== 'layers' && k !== 'width' && k !== 'height' && k !== 'canvasBgColor'
+    );
+    if (overrideKeys.length > 0 && !safeIncoming.layers) {
+      resolvedVariables.layers = resolvedVariables.layers.map((layer: any) => {
+        if (!layer) return layer;
+        const updated = { ...layer };
+        for (const key of overrideKeys) {
+          const val = safeIncoming[key];
+          if (val === undefined || val === null) continue;
+          const match =
+            layer.id === key ||
+            layer.name === key ||
+            layer.role === key ||
+            (layer.role && String(layer.role).toLowerCase() === String(key).toLowerCase());
+          if (match) {
+            if (layer.type === 'text' && typeof val === 'string') {
+              updated.text = val;
+            } else if (layer.type === 'image' && typeof val === 'string') {
+              updated.imageUrl = val;
+            }
+          }
+        }
+        return updated;
+      });
+    }
+
     for (const layer of resolvedVariables.layers) {
       if (layer && layer.type === 'image' && layer.imageUrl) {
         layer.imageUrl = await resolveImageToBase64(layer.imageUrl);
@@ -71,7 +108,7 @@ export async function renderAdToPng(
   const imageKeys = ['image', 'url', 'avatar', 'src', 'logo', 'background', 'product', 'badge', 'flag', 'subject'];
   for (const key of Object.keys(resolvedVariables)) {
     const keyLower = key.toLowerCase();
-    const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color', 'position', 'align', 'mode', 'scale', 'width', 'height'].some(word => keyLower.includes(word));
+    const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color', 'position', 'align', 'mode', 'scale', 'width', 'height', 'layers'].some(word => keyLower.includes(word));
     if (isTextKey) {
       continue;
     }
@@ -85,11 +122,9 @@ export async function renderAdToPng(
     }
   }
 
-  // Ignore SSL issues for internal requests
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
   // Load fonts
   const fonts = await getFontBuffers();
+
 
   // Scan variables for emojis
   const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F09F}\u{1F1E0}-\u{1F1FF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2B50}\u{263A}\u{26A1}\u{2705}]/gu;
@@ -176,6 +211,14 @@ export async function renderAdToPng(
       if (typeof sanitizedVars[key] === 'string' && (sanitizedVars[key].startsWith('data:') || sanitizedVars[key].startsWith('http'))) {
         sanitizedVars[key] = SAFE_PNG_PLACEHOLDER;
       }
+    }
+    if (sanitizedVars.layers && Array.isArray(sanitizedVars.layers)) {
+      sanitizedVars.layers = sanitizedVars.layers.map((l: any) => {
+        if (l && l.type === 'image') {
+          return { ...l, imageUrl: SAFE_PNG_PLACEHOLDER };
+        }
+        return l;
+      });
     }
     const fallbackElement = React.createElement(Template, {
       ...sanitizedVars,

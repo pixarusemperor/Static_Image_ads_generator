@@ -652,11 +652,34 @@ export const TEMPLATE_CONTRACTS: Record<string, TemplateContract> = {
   },
 };
 
+import { getDynamicTemplate, listDynamicTemplates } from './storage';
+
 /**
  * Helper to fetch a complete contract
  */
 export function getTemplateContract(templateId: string): TemplateContract | undefined {
   return TEMPLATE_CONTRACTS[templateId];
+}
+
+/**
+ * Resolves a contract across built-in static templates AND dynamically stored templates.
+ */
+export async function resolveTemplateContract(templateId: string): Promise<TemplateContract | undefined> {
+  if (TEMPLATE_CONTRACTS[templateId]) {
+    return TEMPLATE_CONTRACTS[templateId];
+  }
+  const dynamicTpl = await getDynamicTemplate(templateId);
+  return dynamicTpl?.contract;
+}
+
+/**
+ * Lists all template contracts combining built-in presets and dynamic stored templates.
+ */
+export async function listAllTemplateContracts(): Promise<TemplateContract[]> {
+  const staticList = Object.values(TEMPLATE_CONTRACTS);
+  const dynamicList = await listDynamicTemplates();
+  const dynamicContracts = dynamicList.map(d => d.contract).filter(Boolean);
+  return [...staticList, ...dynamicContracts];
 }
 
 /**
@@ -674,14 +697,15 @@ export interface ValidationDiagnostic {
 
 export function validateTemplatePayload(
   templateId: string,
-  variables: Record<string, any> = {}
+  variables: Record<string, any> = {},
+  customContract?: TemplateContract
 ): ValidationDiagnostic {
-  const contract = TEMPLATE_CONTRACTS[templateId];
+  const contract = customContract || TEMPLATE_CONTRACTS[templateId];
   if (!contract) {
     return {
       isValid: false,
       templateId,
-      missingMandatory: [`Invalid templateId "${templateId}". Available: ${Object.keys(TEMPLATE_CONTRACTS).join(', ')}`],
+      missingMandatory: [`Invalid templateId "${templateId}".`],
       warnings: [],
       compositionAdvice: [],
       resolvedVariables: variables,

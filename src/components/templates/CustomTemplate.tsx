@@ -4,6 +4,7 @@ export interface CanvasLayer {
   id: string;
   type: 'text' | 'image' | 'shape';
   name: string;
+  role?: string;
   left: number;
   top: number;
   width: number;
@@ -15,13 +16,17 @@ export interface CanvasLayer {
   text?: string;
   color?: string;
   fontSize?: number;
-  fontWeight?: string; // 'normal' | 'bold' | '300' | '500' | '800'
+  fontWeight?: string; // 'normal' | 'bold' | '300' | '500' | '700' | '800'
   textAlign?: 'left' | 'center' | 'right';
   textBackgroundColor?: string;
+  lineHeight?: number | string;
+  letterSpacing?: number | string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
   
   // Image specific
   imageUrl?: string;
   borderRadius?: number;
+  objectFit?: 'cover' | 'contain' | 'fill';
   
   // Shape specific
   shapeType?: 'rect' | 'circle';
@@ -65,7 +70,10 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
         .map((layer) => {
           if (!layer) return null;
 
+          const layerOpacity = typeof layer.opacity === 'number' ? Math.max(0, Math.min(1, layer.opacity)) : 1;
+
           if (layer.type === 'shape') {
+            const isCircle = layer.shapeType === 'circle';
             return (
               <div
                 key={layer.id}
@@ -77,15 +85,18 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
                   width: `${layer.width}px`,
                   height: `${layer.height}px`,
                   backgroundColor: layer.backgroundColor || '#1e293b',
-                  borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
+                  borderRadius: isCircle ? '50%' : (layer.borderRadius ? `${layer.borderRadius}px` : '0px'),
+                  borderWidth: layer.borderWidth ? `${layer.borderWidth}px` : undefined,
+                  borderStyle: layer.borderWidth ? 'solid' : undefined,
+                  borderColor: layer.borderColor || undefined,
+                  opacity: layerOpacity,
                 }}
-              >
-                <span />
-              </div>
+              />
             );
           }
 
           if (layer.type === 'image') {
+            const isCircle = layer.shapeType === 'circle';
             return (
               <div
                 key={layer.id}
@@ -96,7 +107,11 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
                   top: `${layer.top}px`,
                   width: `${layer.width}px`,
                   height: `${layer.height}px`,
-                  borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
+                  borderRadius: isCircle ? '50%' : (layer.borderRadius ? `${layer.borderRadius}px` : '0px'),
+                  borderWidth: layer.borderWidth ? `${layer.borderWidth}px` : undefined,
+                  borderStyle: layer.borderWidth ? 'solid' : undefined,
+                  borderColor: layer.borderColor || undefined,
+                  opacity: layerOpacity,
                   overflow: 'hidden',
                 }}
               >
@@ -107,7 +122,7 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover',
+                    objectFit: layer.objectFit || 'cover',
                   }}
                 />
               </div>
@@ -138,6 +153,8 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
                   alignItems: 'center',
                   backgroundColor: layer.textBackgroundColor || 'transparent',
                   borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : '0px',
+                  opacity: layerOpacity,
+                  overflow: 'hidden',
                 }}
               >
                 <span
@@ -146,6 +163,10 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
                     fontSize: `${layer.fontSize || 32}px`,
                     fontWeight: isBold ? 'bold' : 'normal',
                     textAlign: layer.textAlign || 'left',
+                    textTransform: layer.textTransform || 'none',
+                    lineHeight: layer.lineHeight ? `${layer.lineHeight}` : 1.2,
+                    wordBreak: 'break-word',
+                    maxWidth: '100%',
                   }}
                 >
                   {layer.text || ''}
@@ -160,3 +181,4 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
     </div>
   );
 };
+
