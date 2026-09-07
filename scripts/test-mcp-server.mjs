@@ -362,6 +362,94 @@ async function runTests() {
     failedCount++;
   }
 
+  // Test 11: Call tool create_canvas_design
+  console.log('\n--- Test 11: tools/call create_canvas_design ---');
+  try {
+    const res = await sendJsonRpc('tools/call', {
+      name: 'create_canvas_design',
+      arguments: {
+        name: 'MCP High Dopamine Banner',
+        width: 1080,
+        height: 1080,
+        canvas_json: JSON.stringify({
+          version: '6.0.0',
+          objects: [
+            { type: 'rect', left: 0, top: 0, width: 1080, height: 1080, fill: '#0a0a0a' },
+            { type: 'textbox', left: 80, top: 200, width: 920, text: 'LEAKED PROTOCOL', fontSize: 64, fill: '#ffe500' }
+          ]
+        }),
+      },
+    });
+    const parsed = JSON.parse(res?.content?.[0]?.text);
+    console.log(`✓ Created Design ID: ${parsed.design?.id || parsed.id}`);
+    if (parsed.design?.id || parsed.id) {
+      console.log('  PASS: Canvas design project created.');
+      passedCount++;
+    } else {
+      console.error('  FAIL: Missing created design ID');
+      failedCount++;
+    }
+  } catch (err) {
+    console.error('  FAIL Test 11:', err.message);
+    failedCount++;
+  }
+
+  // Test 12: Call tool export_canvas_as_template
+  console.log('\n--- Test 12: tools/call export_canvas_as_template ---');
+  try {
+    const res = await sendJsonRpc('tools/call', {
+      name: 'export_canvas_as_template',
+      arguments: {
+        templateName: 'MCP Test Promo Template',
+        category: 'direct-response',
+        width: 1080,
+        height: 1080,
+        canvasJson: JSON.stringify({
+          version: '6.0.0',
+          objects: [
+            { type: 'rect', left: 0, top: 0, width: 1080, height: 1080, fill: '#111827' },
+            { type: 'textbox', left: 60, top: 120, width: 960, text: 'SHOCKING RESULTS REVEALED', fontSize: 56, fill: '#ffffff' },
+            { type: 'image', left: 60, top: 300, width: 400, height: 400, src: '/templates/assets/30.png' }
+          ]
+        }),
+      },
+    });
+    const parsed = JSON.parse(res?.content?.[0]?.text);
+    console.log(`✓ Imported Template ID: ${parsed.templateId}, Layers: ${parsed.layerCount}`);
+    if (parsed.templateId && parsed.contract) {
+      console.log('  PASS: Canvas layout exported and registered as SuperAds template.');
+      passedCount++;
+    } else {
+      console.error('  FAIL: Missing imported template contract');
+      failedCount++;
+    }
+  } catch (err) {
+    console.error('  FAIL Test 12:', err.message);
+    failedCount++;
+  }
+
+  // Test 13: Call tool list_studio_designs
+  console.log('\n--- Test 13: tools/call list_studio_designs ---');
+  try {
+    const res = await sendJsonRpc('tools/call', {
+      name: 'list_studio_designs',
+      arguments: {},
+    });
+    const parsed = JSON.parse(res?.content?.[0]?.text);
+    const designs = parsed.designs || parsed;
+    console.log(`✓ Retrieved ${Array.isArray(designs) ? designs.length : 0} studio designs.`);
+    if (Array.isArray(designs)) {
+      console.log('  PASS: Studio designs listed successfully.');
+      passedCount++;
+    } else {
+      console.error('  FAIL: Expected array of designs');
+      failedCount++;
+    }
+  } catch (err) {
+    console.error('  FAIL Test 13:', err.message);
+    failedCount++;
+  }
+
   console.log(`\n========================================`);
   console.log(`Verification Complete: ${passedCount} PASSED, ${failedCount} FAILED`);
   console.log(`========================================\n`);

@@ -86,9 +86,13 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
                   height: `${layer.height}px`,
                   backgroundColor: layer.backgroundColor || '#1e293b',
                   borderRadius: isCircle ? '50%' : (layer.borderRadius ? `${layer.borderRadius}px` : '0px'),
-                  borderWidth: layer.borderWidth ? `${layer.borderWidth}px` : undefined,
-                  borderStyle: layer.borderWidth ? 'solid' : undefined,
-                  borderColor: layer.borderColor || undefined,
+                  ...(layer.borderWidth
+                    ? {
+                        borderWidth: `${layer.borderWidth}px`,
+                        borderStyle: 'solid' as const,
+                        borderColor: layer.borderColor || undefined,
+                      }
+                    : {}),
                   opacity: layerOpacity,
                 }}
               />
@@ -108,9 +112,13 @@ export const CustomTemplate: React.FC<CustomTemplateProps> = ({
                   width: `${layer.width}px`,
                   height: `${layer.height}px`,
                   borderRadius: isCircle ? '50%' : (layer.borderRadius ? `${layer.borderRadius}px` : '0px'),
-                  borderWidth: layer.borderWidth ? `${layer.borderWidth}px` : undefined,
-                  borderStyle: layer.borderWidth ? 'solid' : undefined,
-                  borderColor: layer.borderColor || undefined,
+                  ...(layer.borderWidth
+                    ? {
+                        borderWidth: `${layer.borderWidth}px`,
+                        borderStyle: 'solid' as const,
+                        borderColor: layer.borderColor || undefined,
+                      }
+                    : {}),
                   opacity: layerOpacity,
                   overflow: 'hidden',
                 }}

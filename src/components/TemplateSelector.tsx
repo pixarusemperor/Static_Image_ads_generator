@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { TemplateId } from '@/components/templates';
 import { 
-  TEMPLATES_REGISTRY, 
+  getAllTemplates, 
   TEMPLATE_CATEGORIES, 
   TemplateCategory, 
   TemplateMetadata 
@@ -27,7 +27,8 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   const [activeCategory, setActiveCategory] = useState<TemplateCategory>('all');
   const [previewModalTemplate, setPreviewModalTemplate] = useState<TemplateMetadata | null>(null);
 
-  const filteredTemplates = TEMPLATES_REGISTRY.filter((t) => {
+  const allTemplates = getAllTemplates();
+  const filteredTemplates = allTemplates.filter((t) => {
     if (activeCategory === 'all') return true;
     return t.category === activeCategory;
   });

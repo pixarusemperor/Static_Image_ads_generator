@@ -591,6 +591,92 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['templateId', 'rawContent'],
         },
       },
+      {
+        name: 'create_canvas_design',
+        description: 'Creates a new OpenDesign multi-page canvas design project with custom dimensions, background color, and initial pages or layers.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Descriptive name for the design project.',
+            },
+            width: {
+              type: 'number',
+              description: 'Canvas width in pixels (default 1080).',
+              default: 1080,
+            },
+            height: {
+              type: 'number',
+              description: 'Canvas height in pixels (default 1080).',
+              default: 1080,
+            },
+            canvas_json: {
+              type: 'string',
+              description: 'Optional initial Fabric.js canvas JSON string.',
+            },
+            endpoint: {
+              type: 'string',
+              description: 'Optional custom API endpoint URL.',
+            },
+          },
+          required: ['name'],
+        },
+      },
+      {
+        name: 'export_canvas_as_template',
+        description: 'Converts a Fabric.js canvas JSON or a saved studio design into a registered SuperAds dynamic template with 3-Sigma Glyph Capacity bounds.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            templateName: {
+              type: 'string',
+              description: 'Name for the imported template.',
+            },
+            designId: {
+              type: 'string',
+              description: 'Optional ID of an existing studio design to import.',
+            },
+            canvasJson: {
+              type: 'string',
+              description: 'Optional raw Fabric.js canvas JSON string.',
+            },
+            category: {
+              type: 'string',
+              description: 'Category classification (e.g. direct-response, social, publisher).',
+              default: 'direct-response',
+            },
+            width: {
+              type: 'number',
+              description: 'Canvas width in pixels (default 1080).',
+              default: 1080,
+            },
+            height: {
+              type: 'number',
+              description: 'Canvas height in pixels (default 1080).',
+              default: 1080,
+            },
+            endpoint: {
+              type: 'string',
+              description: 'Optional custom API endpoint URL.',
+            },
+          },
+          required: ['templateName'],
+        },
+      },
+      {
+        name: 'list_studio_designs',
+        description: 'Returns all OpenDesign studio designs saved in the database or local storage.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            endpoint: {
+              type: 'string',
+              description: 'Optional custom API endpoint URL.',
+            },
+          },
+        },
+      },
     ],
   };
 });
@@ -968,6 +1054,106 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           action: 'adapt',
           templateId,
           variables: rawContent,
+        });
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case 'create_canvas_design': {
+        const endpoint = await getLiveEndpoint(args?.endpoint);
+
+        if (endpoint) {
+          try {
+            const url = `${endpoint.replace(/\/$/, '')}/api/studio/designs`;
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-SuperAds-Source': 'mcp' },
+              body: JSON.stringify(args),
+              signal: AbortSignal.timeout(10000),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+            }
+          } catch (err) {
+            console.error('[mcp-server] /api/studio/designs fetch failed, falling back to headless runner:', err.message);
+          }
+        }
+
+        // Headless runner fallback
+        const result = executeHeadlessRunner({
+          action: 'create-design',
+          payload: args,
+        });
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case 'export_canvas_as_template': {
+        const endpoint = await getLiveEndpoint(args?.endpoint);
+
+        if (endpoint) {
+          try {
+            const url = `${endpoint.replace(/\/$/, '')}/api/studio/import-template`;
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-SuperAds-Source': 'mcp' },
+              body: JSON.stringify({
+                name: args.templateName || args.name,
+                designId: args.designId,
+                canvasJson: args.canvasJson,
+                category: args.category,
+                width: args.width,
+                height: args.height,
+              }),
+              signal: AbortSignal.timeout(15000),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+            }
+          } catch (err) {
+            console.error('[mcp-server] /api/studio/import-template fetch failed, falling back to headless runner:', err.message);
+          }
+        }
+
+        // Headless runner fallback
+        const result = executeHeadlessRunner({
+          action: 'import-template',
+          payload: args,
+        });
+
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case 'list_studio_designs': {
+        const endpoint = await getLiveEndpoint(args?.endpoint);
+
+        if (endpoint) {
+          try {
+            const url = `${endpoint.replace(/\/$/, '')}/api/studio/designs`;
+            const res = await fetch(url, {
+              headers: { 'X-SuperAds-Source': 'mcp' },
+              signal: AbortSignal.timeout(10000),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+            }
+          } catch (err) {
+            console.error('[mcp-server] /api/studio/designs GET failed, falling back to headless runner:', err.message);
+          }
+        }
+
+        // Headless runner fallback
+        const result = executeHeadlessRunner({
+          action: 'list-designs',
         });
 
         return {

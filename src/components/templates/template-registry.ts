@@ -1,4 +1,6 @@
 import { TemplateId } from './index';
+import { CanvasLayer } from './CustomTemplate';
+import type { TemplateContract } from '@/core/templates/contracts';
 
 export interface TemplateMetadata {
   id: TemplateId;
@@ -159,8 +161,44 @@ export const TEMPLATES_REGISTRY: TemplateMetadata[] = [
   },
 ];
 
+export const customTemplatesRegistry: TemplateMetadata[] = [];
+
+export function registerCustomTemplateMetadata(meta: TemplateMetadata) {
+  const existingIdx = customTemplatesRegistry.findIndex((t) => t.id === meta.id);
+  if (existingIdx !== -1) {
+    customTemplatesRegistry[existingIdx] = meta;
+  } else {
+    customTemplatesRegistry.push(meta);
+  }
+}
+
+export function getAllTemplates(): TemplateMetadata[] {
+  return [...TEMPLATES_REGISTRY, ...customTemplatesRegistry];
+}
+
 export const templateRegistry = TEMPLATES_REGISTRY;
 
-export function getTemplateMetadata(id: TemplateId): TemplateMetadata | undefined {
-  return TEMPLATES_REGISTRY.find(t => t.id === id);
+export function getTemplateMetadata(id: string): TemplateMetadata | undefined {
+  return getAllTemplates().find(t => t.id === id);
+}
+
+export interface ImportedTemplateResult {
+  templateId: string;
+  name: string;
+  layers: CanvasLayer[];
+  contract: TemplateContract;
+  defaultVariables: Record<string, unknown>;
+  width: number;
+  height: number;
+  canvasBgColor: string;
+}
+
+export const customTemplatesStore = new Map<string, ImportedTemplateResult>();
+
+export function registerImportedCustomTemplate(data: ImportedTemplateResult) {
+  customTemplatesStore.set(data.templateId, data);
+}
+
+export function getImportedCustomTemplate(templateId: string): ImportedTemplateResult | undefined {
+  return customTemplatesStore.get(templateId);
 }

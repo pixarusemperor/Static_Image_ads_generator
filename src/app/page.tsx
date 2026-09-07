@@ -23,8 +23,11 @@ import {
   Move,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Palette
 } from 'lucide-react';
+import { OpenDesignStudio } from '@/components/studio/OpenDesignStudio';
+import { getImportedCustomTemplate } from '@/components/templates/template-registry';
 
 // Logical layer definitions for each template
 const templateLayers: Record<TemplateId, { key: string; name: string; type: 'text' | 'image' | 'color' }[]> = {
@@ -153,6 +156,10 @@ interface ChatMessage {
 }
 
 export default function HTMLCSSEditorDashboard() {
+  // --- Navigation Panel Tab ---
+  type MainNavTab = 'ad-generator' | 'opendesign-studio';
+  const [activeTab, setActiveTab] = useState<MainNavTab>('ad-generator');
+
   // --- Active Editor State ---
   const [templateId, setTemplateId] = useState<TemplateId>('1-a');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,7 +205,12 @@ export default function HTMLCSSEditorDashboard() {
   // Update variables when changing templates
   const handleTemplateChange = (id: TemplateId) => {
     setTemplateId(id);
-    setVariables(defaultTemplatesData[id] || {});
+    const custom = getImportedCustomTemplate(id);
+    if (custom) {
+      setVariables(custom.defaultVariables || {});
+    } else {
+      setVariables(defaultTemplatesData[id] || {});
+    }
     setSelectedLayerKey(null);
     setOffsets({
       subjectImage: { x: 0, y: 0 },
@@ -658,6 +670,34 @@ export default function HTMLCSSEditorDashboard() {
           </span>
         </div>
 
+        {/* Center: Top Panel Switcher */}
+        <div className="flex items-center p-1 rounded-xl bg-zinc-900/90 border border-zinc-800 shadow-inner">
+          <button
+            type="button"
+            onClick={() => setActiveTab('ad-generator')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'ad-generator'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            <span>Ad Generator</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('opendesign-studio')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'opendesign-studio'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>OpenDesign Studio</span>
+          </button>
+        </div>
+
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -689,7 +729,17 @@ export default function HTMLCSSEditorDashboard() {
       </header>
 
       {/* --- Main Dashboard Area --- */}
-      <div className="flex flex-1 overflow-hidden">
+      {activeTab === 'opendesign-studio' ? (
+        <div className="flex-1 w-full h-full overflow-hidden bg-[#F3F4F7]">
+          <OpenDesignStudio
+            onImportToSuperAds={(newTemplateId) => {
+              handleTemplateChange(newTemplateId as any);
+              setActiveTab('ad-generator');
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden">
         
         {/* --- LEFT PANEL: Visual Template Gallery, Reference Analyzer & Layer Tree --- */}
         <aside className="w-96 flex flex-col border-r border-zinc-800 bg-zinc-900/30 backdrop-blur-sm overflow-y-auto custom-scrollbar p-4 gap-5">
@@ -1106,6 +1156,7 @@ export default function HTMLCSSEditorDashboard() {
           </form>
         </aside>
       </div>
+      )}
 
       {/* --- In-App AI Settings & Telemetry Modal --- */}
       <SettingsModal

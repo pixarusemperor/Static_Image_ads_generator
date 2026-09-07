@@ -8,6 +8,7 @@ import { resolveImageToBase64, SAFE_PNG_PLACEHOLDER } from '@/utils/image';
 import { getFontBuffers } from '@/utils/fonts';
 import { isR2Configured } from '@/lib/env';
 import { uploadToR2 } from '@/lib/r2';
+import { getImportedCustomTemplate } from '@/components/templates/template-registry';
 import crypto from 'crypto';
 
 const emojiCache: Record<string, string> = {};
@@ -39,8 +40,11 @@ export async function renderAdToPng(
 ): Promise<RenderAdResult> {
   let Template = getTemplateComponent(templateId);
   let dynamicTemplate: StoredTemplate | null = null;
+  const importedCustom = getImportedCustomTemplate(templateId);
 
-  if (!Template) {
+  if (importedCustom) {
+    Template = CustomTemplate;
+  } else if (!Template) {
     dynamicTemplate = await getDynamicTemplate(templateId);
     if (dynamicTemplate) {
       Template = CustomTemplate;
@@ -50,12 +54,20 @@ export async function renderAdToPng(
   }
 
   // Determine canvas dimensions
-  const width = options.width || incomingVariables?.width || dynamicTemplate?.dimensions?.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
-  const height = options.height || incomingVariables?.height || dynamicTemplate?.dimensions?.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
+  const width = options.width || incomingVariables?.width || importedCustom?.width || dynamicTemplate?.dimensions?.width || templatesDimensions[templateId as TemplateId]?.width || 1080;
+  const height = options.height || incomingVariables?.height || importedCustom?.height || dynamicTemplate?.dimensions?.height || templatesDimensions[templateId as TemplateId]?.height || 1080;
 
   // Merge default variables with user overrides
   let defaults: Record<string, any> = {};
-  if (dynamicTemplate) {
+  if (importedCustom) {
+    defaults = {
+      ...(importedCustom.defaultVariables || {}),
+      canvasBgColor: importedCustom.canvasBgColor || '#0f172a',
+      layers: importedCustom.layers || [],
+      width: importedCustom.width || 1080,
+      height: importedCustom.height || 1080,
+    };
+  } else if (dynamicTemplate) {
     defaults = {
       ...(dynamicTemplate.defaultVariables || {}),
       canvasBgColor: dynamicTemplate.canvas_json?.background || '#0f172a',
@@ -105,18 +117,23 @@ export async function renderAdToPng(
   }
 
   // Resolve all image fields to base64 Data URLs for Satori
-  const imageKeys = ['image', 'url', 'avatar', 'src', 'logo', 'background', 'product', 'badge', 'flag', 'subject'];
+  const imageKeys = ['image', 'avatarurl', 'src', 'logo', 'background', 'product', 'flagbadgeurl', 'subject'];
   for (const key of Object.keys(resolvedVariables)) {
+    const value = resolvedVariables[key];
+    if (typeof value !== 'string' || value.trim() === '') {
+      continue;
+    }
+
     const keyLower = key.toLowerCase();
-    const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color', 'position', 'align', 'mode', 'scale', 'width', 'height', 'layers'].some(word => keyLower.includes(word));
+    const isTextKey = ['text', 'line', 'content', 'title', 'salary', 'commissions', 'stats', 'author', 'handle', 'paragraph', 'color', 'position', 'align', 'mode', 'scale', 'width', 'height', 'layers', 'badge', 'headline', 'subtitle', 'sender', 'time', 'notice', 'reassurance'].some(word => keyLower.includes(word));
     if (isTextKey) {
       continue;
     }
 
     const hasImageWord = imageKeys.some(word => keyLower.includes(word));
-    const value = resolvedVariables[key];
+    const looksLikeImagePath = value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/') || value.startsWith('data:image/') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(value);
 
-    if (hasImageWord || (typeof value === 'string' && (value.startsWith('http') || value.startsWith('/') || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(value)))) {
+    if (hasImageWord || looksLikeImagePath) {
       const resolved = await resolveImageToBase64(value);
       resolvedVariables[key] = (resolved && resolved.length > 50) ? resolved : SAFE_PNG_PLACEHOLDER;
     }

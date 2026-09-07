@@ -115,7 +115,6 @@ export async function resolveImageToBase64(imageSrc: string | undefined): Promis
       path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'templates', 'assets', path.basename(cleanSrc)),
       path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'templates', 'thumbnails', path.basename(cleanSrc)),
       path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', path.basename(cleanSrc)),
-      path.join(/*turbopackIgnore: true*/ process.cwd(), cleanSrc),
     ];
 
     let foundPath = '';

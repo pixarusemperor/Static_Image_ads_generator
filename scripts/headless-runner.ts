@@ -10,6 +10,12 @@ import path from 'path';
 import { renderAdToPng } from '../src/core/renderer/engine';
 import { adaptContentToTemplate } from '../src/core/templates/adapter';
 import { orchestrateCampaign, OrchestrationPayload } from '../src/core/orchestration';
+import {
+  listStudioDesigns,
+  createStudioDesign,
+  getStudioDesign,
+} from '../src/core/database/studio';
+import { importOpenDesignAsTemplate } from '../src/core/contracts/opendesign-importer';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -77,6 +83,61 @@ async function main() {
 
       const result = await orchestrateCampaign(payload);
       console.log(JSON.stringify(result));
+    } else if (action === 'create-design') {
+      let payload: any = {};
+      try {
+        payload = JSON.parse(payloadJson);
+      } catch {}
+
+      const design = await createStudioDesign({
+        name: payload.name || 'Untitled Design',
+        width: payload.width || 1080,
+        height: payload.height || 1080,
+        canvas_json: payload.canvas_json || payload.canvasJson,
+      });
+      console.log(JSON.stringify({ success: true, design }));
+    } else if (action === 'list-designs') {
+      const designs = await listStudioDesigns();
+      console.log(JSON.stringify({ success: true, designs }));
+    } else if (action === 'import-template') {
+      let payload: any = {};
+      try {
+        payload = JSON.parse(payloadJson);
+      } catch (err: any) {
+        throw new Error(`Invalid JSON payload: ${err.message}`);
+      }
+
+      let canvasJson = payload.canvasJson || payload.canvas_json;
+      if (!canvasJson && payload.designId) {
+        const design = await getStudioDesign(payload.designId);
+        if (design) {
+          canvasJson = design.canvas_json || (design.pages && design.pages[0]?.canvas_json);
+        }
+      }
+      if (!canvasJson) {
+        throw new Error('canvasJson or valid designId is required to import template');
+      }
+
+      const result = await importOpenDesignAsTemplate({
+        id: payload.id || payload.templateId,
+        name: payload.templateName || payload.name || 'Imported Template',
+        canvasJson: typeof canvasJson === 'string' ? canvasJson : JSON.stringify(canvasJson),
+        category: payload.category || 'direct-response',
+        width: payload.width || 1080,
+        height: payload.height || 1080,
+        thumbnailUrl: payload.thumbnailUrl,
+      });
+
+      console.log(
+        JSON.stringify({
+          success: true,
+          templateId: result.templateId,
+          name: result.name,
+          layerCount: result.layers.length,
+          contract: result.contract,
+          defaultVariables: result.defaultVariables,
+        })
+      );
     } else {
       throw new Error(`Unknown action: ${action}`);
     }

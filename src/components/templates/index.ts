@@ -87,6 +87,12 @@ export const templatesDimensions: Record<TemplateId, { width: number; height: nu
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getTemplateComponent(templateId: string): React.ComponentType<any> | null {
-  const normalizedId = templateId.toLowerCase() as TemplateId;
-  return templatesMap[normalizedId] || null;
+  const normalizedId = templateId.toLowerCase();
+  if (templatesMap[normalizedId as TemplateId]) {
+    return templatesMap[normalizedId as TemplateId];
+  }
+  if (normalizedId.startsWith('custom') || normalizedId.includes('custom') || normalizedId.includes('studio')) {
+    return CustomTemplate;
+  }
+  return null;
 }

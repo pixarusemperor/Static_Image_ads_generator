@@ -77,3 +77,42 @@ BEGIN
     END IF;
 END;
 $$;
+
+-- ==============================================================================
+-- 7. OpenDesign Studio Tables
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS studio_designs (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    name TEXT NOT NULL DEFAULT 'Untitled Design',
+    canvas_json TEXT NOT NULL DEFAULT '{}',
+    width INTEGER NOT NULL DEFAULT 1080,
+    height INTEGER NOT NULL DEFAULT 1080,
+    thumbnail_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS studio_pages (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    design_id TEXT NOT NULL REFERENCES studio_designs(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT 'Page 1',
+    canvas_json TEXT NOT NULL DEFAULT '{}',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS studio_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'custom',
+    canvas_json TEXT NOT NULL DEFAULT '{}',
+    width INTEGER NOT NULL DEFAULT 1080,
+    height INTEGER NOT NULL DEFAULT 1080,
+    thumbnail_url TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_studio_designs_updated ON studio_designs(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_studio_pages_design ON studio_pages(design_id, sort_order ASC);
+CREATE INDEX IF NOT EXISTS idx_studio_templates_cat ON studio_templates(category);
