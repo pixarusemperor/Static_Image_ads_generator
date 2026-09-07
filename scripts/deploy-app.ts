@@ -2,7 +2,7 @@ async function deploy() {
   console.log('Triggering Coolify deployment via API...');
   
   const token = '1|cool_1244fb0ed5ea4703555f76bf718c2cd86d6780ac28e809edc3df7fd3dfcfe16d';
-  const appUuid = 'jygt5ernjovbf36q391orfs2';
+  const appUuid = 'itg0ipriumh9bqd11p3lr8ro';
   const url = `https://coolifyone.orizongroup.online/api/v1/applications/${appUuid}`;
   
   // Ignore SSL certificate issues (matching curl's -k option)
